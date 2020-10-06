@@ -21,7 +21,7 @@ pub enum InterpretResult {
     RuntimeError,
 }
 
-macro_rules! binary_op {
+macro_rules! common_op {
     ($vm:ident, $op:tt) => {{
         if !$vm.stack.last().unwrap().is_number() || !$vm.stack[$vm.stack.len() - 2].is_number() {
             $vm.runtime_error("Operands must be numbers.");
@@ -30,7 +30,21 @@ macro_rules! binary_op {
         let b = $vm.stack.pop().unwrap();
         let a = $vm.stack.pop().unwrap();
 
+        (a, b)
+    }}
+}
+
+macro_rules! binary_op {
+    ($vm:ident, $op:tt) => {{
+        let (a, b) = common_op!($vm, $op);
         $vm.stack.push(a $op b);
+    }};
+}
+
+macro_rules! bool_op {
+    ($vm:ident, $op:tt) => {{
+        let (a, b) = common_op!($vm, $op);
+        $vm.stack.push(Value::Bool(a $op b));
     }};
 }
 
@@ -81,13 +95,20 @@ impl VM {
                     OpCode::Nil => self.stack.push(Value::Nil),
                     OpCode::True => self.stack.push(Value::Bool(true)),
                     OpCode::False => self.stack.push(Value::Bool(false)),
+                    OpCode::Equal => {
+                        let b = self.stack.pop().unwrap();
+                        let a = self.stack.pop().unwrap();
+                        self.stack.push(Value::Bool(a == b));
+                    }
+                    OpCode::Greater => bool_op!(self, >),
+                    OpCode::Less => bool_op!(self, <),
                     OpCode::Add => binary_op!(self, +),
                     OpCode::Sub => binary_op!(self, -),
                     OpCode::Mul => binary_op!(self, *),
                     OpCode::Div => binary_op!(self, /),
                     OpCode::Not => {
                         let val = self.stack.pop().unwrap();
-                        self.stack.push(Value::Bool(is_falsey(val)));
+                        self.stack.push(Value::Bool(val.is_falsey()));
                     }
                     OpCode::Negate => {
                         let val = self.stack.last().unwrap();
@@ -117,8 +138,4 @@ impl VM {
         let line = self.chunk.as_ref().unwrap().lines[instruction];
         eprintln!("[line {}] in script", line);
     }
-}
-
-fn is_falsey(val: Value) -> bool {
-    val.is_nil() || (val.is_bool() && !val.as_bool())
 }

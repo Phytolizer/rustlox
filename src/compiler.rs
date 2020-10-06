@@ -97,8 +97,8 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::BangEqual => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Equality,
         },
         TokenKind::Equal => ParseRule {
             prefix: None,
@@ -107,28 +107,28 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::EqualEqual => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Equality,
         },
         TokenKind::Less => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Comparison,
         },
         TokenKind::LessEqual => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Comparison,
         },
         TokenKind::Greater => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Comparison,
         },
         TokenKind::GreaterEqual => ParseRule {
             prefix: None,
-            infix: None,
-            precedence: Precedence::None,
+            infix: Some(Parser::binary),
+            precedence: Precedence::Comparison,
         },
         TokenKind::Identifier => ParseRule {
             prefix: None,
@@ -367,6 +367,12 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         self.parse_precedence(Precedence::try_from(rule.precedence as usize + 1).unwrap())?;
 
         match operator_kind {
+            TokenKind::BangEqual => self.emit_bytes(OpCode::Equal, OpCode::Not),
+            TokenKind::EqualEqual => self.emit_byte(OpCode::Equal),
+            TokenKind::Greater => self.emit_byte(OpCode::Greater),
+            TokenKind::GreaterEqual => self.emit_bytes(OpCode::Less, OpCode::Not),
+            TokenKind::Less => self.emit_byte(OpCode::Less),
+            TokenKind::LessEqual => self.emit_bytes(OpCode::Greater, OpCode::Not),
             TokenKind::Plus => self.emit_byte(OpCode::Add),
             TokenKind::Minus => self.emit_byte(OpCode::Sub),
             TokenKind::Star => self.emit_byte(OpCode::Mul),

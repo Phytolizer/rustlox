@@ -50,6 +50,9 @@ impl Value {
             panic!("not a number");
         }
     }
+    pub fn is_falsey(&self) -> bool {
+        self.is_nil() || (self.is_bool() && !self.as_bool())
+    }
 }
 
 impl Display for Value {
@@ -99,5 +102,21 @@ impl Div for Value {
 
     fn div(self, rhs: Self) -> Self::Output {
         Value::Number(self.as_number() / rhs.as_number())
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Value::Bool(b) => other.is_bool() && *b == other.as_bool(),
+            Value::Nil => other.is_nil(),
+            Value::Number(n) => other.is_number() && *n == other.as_number(),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_number().partial_cmp(&other.as_number())
     }
 }
