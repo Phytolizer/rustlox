@@ -9,8 +9,8 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct VM<'c> {
-    pub chunk: Option<&'c Chunk>,
+pub struct VM {
+    pub chunk: Option<Box<Chunk>>,
     ip: usize,
     stack: Vec<Value>,
 }
@@ -30,24 +30,32 @@ macro_rules! binary_op {
     }};
 }
 
-impl<'c> VM<'c> {
+impl VM {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn interpret(&mut self, source: &[u8]) -> eyre::Result<InterpretResult> {
-        compile(source)?;
-        Ok(InterpretResult::Ok)
+        let mut chunk = Chunk::new();
+        if !compile(source, &mut chunk)? {
+            return Ok(InterpretResult::CompileError);
+        }
+
+        self.chunk = Some(Box::new(chunk));
+        self.ip = 0;
+
+        Ok(self.run())
     }
 
     fn read_byte(&mut self) -> u8 {
-        let byte = self.chunk.unwrap().code[self.ip];
+        let byte = self.chunk.as_ref().unwrap().code[self.ip];
         self.ip += 1;
         byte
     }
 
     fn read_constant(&mut self) -> Value {
-        self.chunk.unwrap().constants[self.read_byte() as usize]
+        let offset = self.read_byte() as usize;
+        self.chunk.as_ref().unwrap().constants[offset]
     }
 
     fn run(&mut self) -> InterpretResult {

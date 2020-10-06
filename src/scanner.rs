@@ -57,6 +57,7 @@ pub enum TokenKind {
     Eof,
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: Vec<u8>,
