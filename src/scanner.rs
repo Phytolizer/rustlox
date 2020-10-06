@@ -80,7 +80,64 @@ impl<'source> Scanner<'source> {
             return self.make_token(TokenKind::Eof);
         }
 
+        match self.advance() {
+            b'(' => return self.make_token(TokenKind::LeftParen),
+            b')' => return self.make_token(TokenKind::RightParen),
+            b'{' => return self.make_token(TokenKind::LeftBrace),
+            b'}' => return self.make_token(TokenKind::RightBrace),
+            b';' => return self.make_token(TokenKind::Semicolon),
+            b',' => return self.make_token(TokenKind::Comma),
+            b'.' => return self.make_token(TokenKind::Dot),
+            b'-' => return self.make_token(TokenKind::Minus),
+            b'+' => return self.make_token(TokenKind::Plus),
+            b'/' => return self.make_token(TokenKind::Slash),
+            b'*' => return self.make_token(TokenKind::Star),
+            b'!' => {
+                if self.matches(b'=') {
+                    return self.make_token(TokenKind::BangEqual);
+                } else {
+                    return self.make_token(TokenKind::Bang);
+                }
+            }
+            b'=' => {
+                if self.matches(b'=') {
+                    return self.make_token(TokenKind::EqualEqual);
+                } else {
+                    return self.make_token(TokenKind::Equal);
+                }
+            }
+            b'<' => {
+                if self.matches(b'=') {
+                    return self.make_token(TokenKind::LessEqual);
+                } else {
+                    return self.make_token(TokenKind::Less);
+                }
+            }
+            b'>' => {
+                if self.matches(b'=') {
+                    return self.make_token(TokenKind::GreaterEqual);
+                } else {
+                    return self.make_token(TokenKind::Greater);
+                }
+            }
+            _ => {}
+        }
+
         self.error_token("Unexpected character.")
+    }
+
+    fn matches(&mut self, expected: u8) -> bool {
+        if self.is_at_end() || self.source[self.current] != expected {
+            false
+        } else {
+            self.current += 1;
+            true
+        }
+    }
+
+    fn advance(&mut self) -> u8 {
+        self.current += 1;
+        self.source[self.current - 1]
     }
 
     fn is_at_end(&self) -> bool {

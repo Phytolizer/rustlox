@@ -41,8 +41,8 @@ fn main() {
 fn repl(vm: &mut VM) -> eyre::Result<()> {
     let stdin = io::stdin();
     let mut stdin_reader = stdin.lock();
-    let mut line = vec![];
     loop {
+        let mut line = vec![];
         print!("> ");
         io::stdout().flush()?;
 
