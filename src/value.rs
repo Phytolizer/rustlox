@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct Value(pub f64);
 
 impl Value {
