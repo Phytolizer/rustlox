@@ -1,3 +1,11 @@
+pub mod chunk;
+pub mod debug;
+
+use chunk::{Chunk, OpCode};
+
 fn main() {
-    println!("Hello, world!");
+    let mut c = Chunk::new();
+    c.write(OpCode::Return);
+
+    debug::disassemble_chunk(&c, "test chunk");
 }
