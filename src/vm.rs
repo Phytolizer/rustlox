@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use crate::{
     chunk::{Chunk, OpCode},
     common::DEBUG_TRACE_EXECUTION,
+    compiler::compile,
     debug::disassemble_instruction,
     value::Value,
 };
@@ -34,10 +35,9 @@ impl<'c> VM<'c> {
         Self::default()
     }
 
-    pub fn interpret(&mut self, chunk: &'c Chunk) -> InterpretResult {
-        self.chunk = Some(chunk);
-        self.ip = 0;
-        self.run()
+    pub fn interpret(&mut self, source: &[u8]) -> eyre::Result<InterpretResult> {
+        compile(source)?;
+        Ok(InterpretResult::Ok)
     }
 
     fn read_byte(&mut self) -> u8 {

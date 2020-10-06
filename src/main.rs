@@ -1,37 +1,76 @@
 pub mod chunk;
 pub mod common;
+pub mod compiler;
 pub mod debug;
+pub mod scanner;
 pub mod value;
 pub mod vm;
 
-use chunk::{Chunk, OpCode};
-use value::Value;
-use vm::VM;
+use std::{
+    ffi::OsString,
+    io::Write,
+    io::{self, BufRead, Read},
+    process::exit,
+};
+
+use vm::{InterpretResult, VM};
 
 fn main() {
     let mut vm = VM::new();
 
-    let mut c = Chunk::new();
-    let constant = c.add_constant(Value(1.2));
-    c.write(OpCode::Constant, 123);
-    c.write(constant as u8, 123);
+    let args: Vec<OsString> = std::env::args_os().collect();
 
-    let constant = c.add_constant(Value(3.4));
-    c.write(OpCode::Constant, 123);
-    c.write(constant as u8, 123);
+    match args.len() {
+        1 => {
+            if let Err(e) = repl(&mut vm) {
+                eprintln!("Fatal error: {}", e);
+            }
+        }
+        2 => {
+            if let Err(e) = run_file(&mut vm, &args[1]) {
+                eprintln!("Fatal error: {}", e);
+            }
+        }
+        _ => {
+            eprintln!("Usage: clox [path]");
+            exit(64);
+        }
+    }
+}
 
-    c.write(OpCode::Add, 123);
+fn repl(vm: &mut VM) -> eyre::Result<()> {
+    let stdin = io::stdin();
+    let mut stdin_reader = stdin.lock();
+    let mut line = vec![];
+    loop {
+        print!("> ");
+        io::stdout().flush()?;
 
-    let constant = c.add_constant(Value(5.6));
-    c.write(OpCode::Constant, 123);
-    c.write(constant as u8, 123);
+        match stdin_reader.read_until(b'\n', &mut line)? {
+            0 => {
+                println!();
+                break;
+            }
+            _ => {
+                vm.interpret(&line)?;
+            }
+        }
+    }
+    Ok(())
+}
 
-    c.write(OpCode::Div, 123);
+fn run_file(vm: &mut VM, file_name: &OsString) -> eyre::Result<()> {
+    let source = {
+        let mut source = vec![];
+        let mut f = std::fs::File::open(&file_name)?;
+        f.read_to_end(&mut source)?;
+        source
+    };
 
-    c.write(OpCode::Negate, 123);
-
-    c.write(OpCode::Return, 123);
-
-    debug::disassemble_chunk(&c, "test chunk");
-    vm.interpret(&c);
+    match vm.interpret(&source)? {
+        InterpretResult::Ok => {}
+        InterpretResult::CompileError => exit(65),
+        InterpretResult::RuntimeError => exit(70),
+    }
+    Ok(())
 }
