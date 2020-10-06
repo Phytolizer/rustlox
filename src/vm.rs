@@ -59,6 +59,10 @@ impl<'c> VM<'c> {
                         let constant = self.read_constant();
                         self.stack.push(constant);
                     }
+                    OpCode::Negate => {
+                        let val = -self.stack.pop().unwrap();
+                        self.stack.push(val);
+                    }
                     OpCode::Return => {
                         if let Some(top) = self.stack.pop() {
                             top.print();

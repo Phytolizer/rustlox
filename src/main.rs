@@ -16,6 +16,8 @@ fn main() {
     c.write(OpCode::Constant, 123);
     c.write(constant as u8, 123);
 
+    c.write(OpCode::Negate, 123);
+
     c.write(OpCode::Return, 123);
 
     debug::disassemble_chunk(&c, "test chunk");
