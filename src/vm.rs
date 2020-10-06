@@ -85,6 +85,10 @@ impl VM {
                     OpCode::Sub => binary_op!(self, -),
                     OpCode::Mul => binary_op!(self, *),
                     OpCode::Div => binary_op!(self, /),
+                    OpCode::Not => {
+                        let val = self.stack.pop().unwrap();
+                        self.stack.push(Value::Bool(is_falsey(val)));
+                    }
                     OpCode::Negate => {
                         let val = self.stack.last().unwrap();
                         if val.is_number() {
@@ -113,4 +117,8 @@ impl VM {
         let line = self.chunk.as_ref().unwrap().lines[instruction];
         eprintln!("[line {}] in script", line);
     }
+}
+
+fn is_falsey(val: Value) -> bool {
+    val.is_nil() || (val.is_bool() && !val.as_bool())
 }

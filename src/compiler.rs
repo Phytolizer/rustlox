@@ -91,7 +91,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::Factor,
         },
         TokenKind::Bang => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::unary),
             infix: None,
             precedence: Precedence::None,
         },
@@ -405,6 +405,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
 
         match operator_kind {
             TokenKind::Minus => self.emit_byte(OpCode::Negate),
+            TokenKind::Bang => self.emit_byte(OpCode::Not),
             _ => unreachable!(),
         }
         Ok(())
