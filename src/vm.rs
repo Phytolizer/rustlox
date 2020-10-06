@@ -78,6 +78,9 @@ impl VM {
                         let constant = self.read_constant();
                         self.stack.push(constant);
                     }
+                    OpCode::Nil => self.stack.push(Value::Nil),
+                    OpCode::True => self.stack.push(Value::Bool(true)),
+                    OpCode::False => self.stack.push(Value::Bool(false)),
                     OpCode::Add => binary_op!(self, +),
                     OpCode::Sub => binary_op!(self, -),
                     OpCode::Mul => binary_op!(self, *),

@@ -161,7 +161,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::False => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -181,7 +181,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::Nil => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -211,7 +211,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::True => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -371,6 +371,16 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             TokenKind::Minus => self.emit_byte(OpCode::Sub),
             TokenKind::Star => self.emit_byte(OpCode::Mul),
             TokenKind::Slash => self.emit_byte(OpCode::Div),
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
+    fn literal(&mut self) -> eyre::Result<()> {
+        match self.previous.kind {
+            TokenKind::False => self.emit_byte(OpCode::False),
+            TokenKind::Nil => self.emit_byte(OpCode::Nil),
+            TokenKind::True => self.emit_byte(OpCode::True),
             _ => unreachable!(),
         }
         Ok(())

@@ -22,6 +22,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
     match OpCode::try_from(chunk.code[offset]) {
         Ok(c) => match c {
             OpCode::Constant => constant_instruction("Constant", chunk, offset),
+            OpCode::Nil => simple_instruction("Nil", offset),
+            OpCode::True => simple_instruction("True", offset),
+            OpCode::False => simple_instruction("False", offset),
             OpCode::Add => simple_instruction("Add", offset),
             OpCode::Sub => simple_instruction("Sub", offset),
             OpCode::Mul => simple_instruction("Mul", offset),
