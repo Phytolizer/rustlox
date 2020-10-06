@@ -46,9 +46,7 @@ impl<'c> VM<'c> {
             if DEBUG_TRACE_EXECUTION {
                 print!("          ");
                 for slot in &self.stack {
-                    print!("[ ");
-                    slot.print();
-                    print!(" ]");
+                    print!("[ {} ]", slot);
                 }
                 println!();
                 disassemble_instruction(self.chunk.as_ref().unwrap(), self.ip);
@@ -65,8 +63,7 @@ impl<'c> VM<'c> {
                     }
                     OpCode::Return => {
                         if let Some(top) = self.stack.pop() {
-                            top.print();
-                            println!();
+                            println!("{}", top);
                         }
                         return InterpretResult::Ok;
                     }

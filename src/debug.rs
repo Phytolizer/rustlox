@@ -34,9 +34,10 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
 fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     let constant = chunk.code[offset + 1];
-    print!("{:<16} {:4} '", name, constant);
-    chunk.constants[constant as usize].print();
-    println!("'");
+    println!(
+        "{:<16} {:4} '{}'",
+        name, constant, chunk.constants[constant as usize]
+    );
     offset + 2
 }
 
