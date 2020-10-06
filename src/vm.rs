@@ -11,6 +11,7 @@ use crate::{
 pub struct VM<'c> {
     pub chunk: Option<&'c Chunk>,
     ip: usize,
+    stack: Vec<Value>,
 }
 
 pub enum InterpretResult {
@@ -43,20 +44,29 @@ impl<'c> VM<'c> {
     fn run(&mut self) -> InterpretResult {
         loop {
             if DEBUG_TRACE_EXECUTION {
+                print!("          ");
+                for slot in &self.stack {
+                    print!("[ ");
+                    slot.print();
+                    print!(" ]");
+                }
+                println!();
                 disassemble_instruction(self.chunk.as_ref().unwrap(), self.ip);
             }
-            match OpCode::try_from(self.read_byte()) {
-                Ok(oc) => match oc {
+            if let Ok(oc) = OpCode::try_from(self.read_byte()) {
+                match oc {
                     OpCode::Constant => {
                         let constant = self.read_constant();
-                        constant.print();
-                        println!();
+                        self.stack.push(constant);
                     }
                     OpCode::Return => {
+                        if let Some(top) = self.stack.pop() {
+                            top.print();
+                            println!();
+                        }
                         return InterpretResult::Ok;
                     }
-                },
-                Err(_) => {}
+                }
             }
         }
     }
