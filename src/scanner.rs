@@ -121,10 +121,60 @@ impl<'source> Scanner<'source> {
                     return self.make_token(TokenKind::Greater);
                 }
             }
+            b'"' => return self.string(),
+            c if c.is_ascii_digit() => return self.number(),
+            c if Self::is_alpha(c) => return self.identifier(),
             _ => {}
         }
 
         self.error_token("Unexpected character.")
+    }
+
+    fn is_alpha(c: u8) -> bool {
+        c.is_ascii_alphabetic() || c == b'_'
+    }
+
+    fn identifier(&mut self) -> Token {
+        while Self::is_alpha(self.peek()) || self.peek().is_ascii_digit() {
+            self.advance();
+        }
+
+        self.make_token(self.identifier_kind())
+    }
+
+    fn identifier_kind(&self) -> TokenKind {
+        TokenKind::Identifier
+    }
+
+    fn number(&mut self) -> Token {
+        while self.peek().is_ascii_digit() {
+            self.advance();
+        }
+
+        if self.peek() == b'.' && self.peek_next().is_ascii_digit() {
+            self.advance();
+            while self.peek().is_ascii_digit() {
+                self.advance();
+            }
+        }
+
+        self.make_token(TokenKind::Number)
+    }
+
+    fn string(&mut self) -> Token {
+        while self.peek() != b'"' && !self.is_at_end() {
+            if self.peek() == b'\n' {
+                self.line += 1
+            }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            self.error_token("Unterminated string.")
+        } else {
+            self.advance();
+            self.make_token(TokenKind::String)
+        }
     }
 
     fn skip_whitespace(&mut self) {
