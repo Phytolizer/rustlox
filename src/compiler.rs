@@ -384,7 +384,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
 
     fn number(&mut self) -> eyre::Result<()> {
         let value = String::from_utf8_lossy(&self.previous.lexeme).parse::<f64>()?;
-        self.emit_constant(Value(value))?;
+        self.emit_constant(Value::Number(value))?;
         Ok(())
     }
 

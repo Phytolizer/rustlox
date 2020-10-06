@@ -23,6 +23,10 @@ pub enum InterpretResult {
 
 macro_rules! binary_op {
     ($vm:ident, $op:tt) => {{
+        if !$vm.stack.last().unwrap().is_number() || !$vm.stack[$vm.stack.len() - 2].is_number() {
+            $vm.runtime_error("Operands must be numbers.");
+            return InterpretResult::RuntimeError;
+        }
         let b = $vm.stack.pop().unwrap();
         let a = $vm.stack.pop().unwrap();
 
@@ -79,8 +83,14 @@ impl VM {
                     OpCode::Mul => binary_op!(self, *),
                     OpCode::Div => binary_op!(self, /),
                     OpCode::Negate => {
-                        let val = -self.stack.pop().unwrap();
-                        self.stack.push(val);
+                        let val = self.stack.last().unwrap();
+                        if val.is_number() {
+                            let val = self.stack.pop().unwrap();
+                            self.stack.push(-val);
+                        } else {
+                            self.runtime_error("Operand must be a number.");
+                            return InterpretResult::RuntimeError;
+                        }
                     }
                     OpCode::Return => {
                         if let Some(top) = self.stack.pop() {
@@ -91,5 +101,13 @@ impl VM {
                 }
             }
         }
+    }
+
+    fn runtime_error(&mut self, message: &str) {
+        eprintln!("{}", message);
+
+        let instruction = self.ip - 1;
+        let line = self.chunk.as_ref().unwrap().lines[instruction];
+        eprintln!("[line {}] in script", line);
     }
 }

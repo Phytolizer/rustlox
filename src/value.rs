@@ -4,37 +4,61 @@ use std::{
 };
 
 #[derive(Copy, Clone)]
-pub struct Value(pub f64);
+pub enum Value {
+    Bool(bool),
+    Nil,
+    Number(f64),
+}
 
-impl Add for Value {
-    type Output = Value;
+impl Value {
+    pub fn is_bool(&self) -> bool {
+        if let Self::Bool(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 
-    fn add(self, rhs: Self) -> Self::Output {
-        Value(self.0 + rhs.0)
+    pub fn is_nil(&self) -> bool {
+        if let Self::Nil = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_number(&self) -> bool {
+        if let Self::Number(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn as_bool(&self) -> bool {
+        if let Self::Bool(b) = self {
+            *b
+        } else {
+            panic!("not a bool");
+        }
+    }
+
+    pub fn as_number(&self) -> f64 {
+        if let Self::Number(n) = self {
+            *n
+        } else {
+            panic!("not a number");
+        }
     }
 }
 
-impl Sub for Value {
-    type Output = Value;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Value(self.0 - rhs.0)
-    }
-}
-
-impl Mul for Value {
-    type Output = Value;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Value(self.0 * rhs.0)
-    }
-}
-
-impl Div for Value {
-    type Output = Value;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Value(self.0 / rhs.0)
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bool(b) => write!(f, "{}", b),
+            Self::Nil => write!(f, "nil"),
+            Self::Number(n) => write!(f, "{}", n),
+        }
     }
 }
 
@@ -42,12 +66,38 @@ impl Neg for Value {
     type Output = Value;
 
     fn neg(self) -> Self::Output {
-        Value(-self.0)
+        Self::Number(-self.as_number())
     }
 }
 
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl Add for Value {
+    type Output = Value;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Value::Number(self.as_number() + rhs.as_number())
+    }
+}
+
+impl Sub for Value {
+    type Output = Value;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Value::Number(self.as_number() - rhs.as_number())
+    }
+}
+
+impl Mul for Value {
+    type Output = Value;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Value::Number(self.as_number() * rhs.as_number())
+    }
+}
+
+impl Div for Value {
+    type Output = Value;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Value::Number(self.as_number() / rhs.as_number())
     }
 }
