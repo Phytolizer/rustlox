@@ -16,6 +16,18 @@ fn main() {
     c.write(OpCode::Constant, 123);
     c.write(constant as u8, 123);
 
+    let constant = c.add_constant(Value(3.4));
+    c.write(OpCode::Constant, 123);
+    c.write(constant as u8, 123);
+
+    c.write(OpCode::Add, 123);
+
+    let constant = c.add_constant(Value(5.6));
+    c.write(OpCode::Constant, 123);
+    c.write(constant as u8, 123);
+
+    c.write(OpCode::Div, 123);
+
     c.write(OpCode::Negate, 123);
 
     c.write(OpCode::Return, 123);

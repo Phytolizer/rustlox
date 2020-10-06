@@ -4,6 +4,10 @@ use crate::value::Value;
 #[derive(num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
 pub enum OpCode {
     Constant,
+    Add,
+    Sub,
+    Mul,
+    Div,
     Negate,
     Return,
 }

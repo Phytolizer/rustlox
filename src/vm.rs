@@ -20,6 +20,15 @@ pub enum InterpretResult {
     RuntimeError,
 }
 
+macro_rules! binary_op {
+    ($vm:ident, $op:tt) => {{
+        let b = $vm.stack.pop().unwrap();
+        let a = $vm.stack.pop().unwrap();
+
+        $vm.stack.push(a $op b);
+    }};
+}
+
 impl<'c> VM<'c> {
     pub fn new() -> Self {
         Self::default()
@@ -57,6 +66,10 @@ impl<'c> VM<'c> {
                         let constant = self.read_constant();
                         self.stack.push(constant);
                     }
+                    OpCode::Add => binary_op!(self, +),
+                    OpCode::Sub => binary_op!(self, -),
+                    OpCode::Mul => binary_op!(self, *),
+                    OpCode::Div => binary_op!(self, /),
                     OpCode::Negate => {
                         let val = -self.stack.pop().unwrap();
                         self.stack.push(val);

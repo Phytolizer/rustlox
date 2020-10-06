@@ -1,7 +1,42 @@
-use std::{fmt::Display, ops::Neg};
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
 
 #[derive(Copy, Clone)]
 pub struct Value(pub f64);
+
+impl Add for Value {
+    type Output = Value;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Value(self.0 + rhs.0)
+    }
+}
+
+impl Sub for Value {
+    type Output = Value;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Value(self.0 - rhs.0)
+    }
+}
+
+impl Mul for Value {
+    type Output = Value;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Value(self.0 * rhs.0)
+    }
+}
+
+impl Div for Value {
+    type Output = Value;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Value(self.0 / rhs.0)
+    }
+}
 
 impl Neg for Value {
     type Output = Value;
