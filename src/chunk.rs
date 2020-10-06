@@ -11,6 +11,7 @@ pub enum OpCode {
 pub struct Chunk {
     pub code: Vec<u8>,
     pub constants: Vec<Value>,
+    pub lines: Vec<usize>,
 }
 
 impl Chunk {
@@ -18,8 +19,9 @@ impl Chunk {
         Self::default()
     }
 
-    pub fn write<B: Into<u8>>(&mut self, byte: B) {
+    pub fn write<B: Into<u8>>(&mut self, byte: B, line: usize) {
         self.code.push(byte.into());
+        self.lines.push(line);
     }
 
     pub fn add_constant(&mut self, value: Value) -> usize {
