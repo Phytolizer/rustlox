@@ -74,6 +74,7 @@ impl<'source> Scanner<'source> {
     }
 
     pub fn scan_token(&mut self) -> Token {
+        self.skip_whitespace();
         self.start = self.current;
 
         if self.is_at_end() {
@@ -124,6 +125,46 @@ impl<'source> Scanner<'source> {
         }
 
         self.error_token("Unexpected character.")
+    }
+
+    fn skip_whitespace(&mut self) {
+        loop {
+            match self.peek() {
+                b' ' | b'\r' | b'\t' => {
+                    self.advance();
+                }
+                b'\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                b'/' => {
+                    if self.peek_next() == b'/' {
+                        while self.peek() != b'\n' && !self.is_at_end() {
+                            self.advance();
+                        }
+                    } else {
+                        return;
+                    }
+                }
+                _ => return,
+            }
+        }
+    }
+
+    fn peek_next(&self) -> u8 {
+        if self.current + 1 >= self.source.len() {
+            b'\0'
+        } else {
+            self.source[self.current + 1]
+        }
+    }
+
+    fn peek(&self) -> u8 {
+        if self.is_at_end() {
+            b'\0'
+        } else {
+            self.source[self.current]
+        }
     }
 
     fn matches(&mut self, expected: u8) -> bool {
