@@ -16,6 +16,7 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
     match OpCode::try_from(chunk.code[offset]) {
         Ok(c) => match c {
+            OpCode::Constant => constant_instruction("Constant", chunk, offset),
             OpCode::Return => simple_instruction("Return", offset),
         },
         Err(_) => {
@@ -23,6 +24,14 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             offset + 1
         }
     }
+}
+
+fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+    let constant = chunk.code[offset + 1];
+    print!("{:<16} {:4} '", name, constant);
+    chunk.constants[constant as usize].print();
+    println!("'");
+    offset + 2
 }
 
 fn simple_instruction(name: &str, offset: usize) -> usize {
