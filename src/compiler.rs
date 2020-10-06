@@ -1,5 +1,3 @@
-use enum_map::enum_map;
-use lazy_static::lazy_static;
 use std::{convert::TryFrom, io::Write};
 
 use crate::{
