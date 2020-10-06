@@ -5,7 +5,7 @@ pub struct Scanner<'source> {
     line: usize,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, enum_map::Enum)]
 pub enum TokenKind {
     // Single-character tokens.
     LeftParen,
