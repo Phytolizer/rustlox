@@ -143,7 +143,53 @@ impl<'source> Scanner<'source> {
     }
 
     fn identifier_kind(&self) -> TokenKind {
-        TokenKind::Identifier
+        match self.source[self.start] {
+            b'a' => self.check_keyword(1, b"nd", TokenKind::And),
+            b'c' => self.check_keyword(1, b"lass", TokenKind::Class),
+            b'e' => self.check_keyword(1, b"lse", TokenKind::Else),
+            b'f' => {
+                if self.current - self.start > 1 {
+                    match self.source[self.start + 1] {
+                        b'a' => self.check_keyword(2, b"lse", TokenKind::False),
+                        b'o' => self.check_keyword(2, b"r", TokenKind::For),
+                        b'u' => self.check_keyword(2, b"n", TokenKind::Fun),
+                        _ => TokenKind::Identifier,
+                    }
+                } else {
+                    TokenKind::Identifier
+                }
+            }
+            b'i' => self.check_keyword(1, b"f", TokenKind::If),
+            b'n' => self.check_keyword(1, b"il", TokenKind::Nil),
+            b'o' => self.check_keyword(1, b"r", TokenKind::Or),
+            b'p' => self.check_keyword(1, b"rint", TokenKind::Print),
+            b'r' => self.check_keyword(1, b"eturn", TokenKind::Return),
+            b's' => self.check_keyword(1, b"uper", TokenKind::Super),
+            b't' => {
+                if self.current - self.start > 1 {
+                    match self.source[self.start + 1] {
+                        b'h' => self.check_keyword(2, b"is", TokenKind::This),
+                        b'r' => self.check_keyword(2, b"ue", TokenKind::True),
+                        _ => TokenKind::Identifier,
+                    }
+                } else {
+                    TokenKind::Identifier
+                }
+            }
+            b'v' => self.check_keyword(1, b"ar", TokenKind::Var),
+            b'w' => self.check_keyword(1, b"hile", TokenKind::While),
+            _ => TokenKind::Identifier,
+        }
+    }
+
+    fn check_keyword(&self, start_offset: usize, rest: &[u8], kind: TokenKind) -> TokenKind {
+        if self.current - (self.start + start_offset) == rest.len()
+            && &self.source[self.start + start_offset..self.current] == rest
+        {
+            kind
+        } else {
+            TokenKind::Identifier
+        }
     }
 
     fn number(&mut self) -> Token {
