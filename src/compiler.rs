@@ -280,9 +280,39 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         }
         Ok(())
     }
+
     fn expression(&mut self) -> eyre::Result<()> {
         self.parse_precedence(Precedence::Assignment)
     }
+
+    fn expression_statement(&mut self) -> eyre::Result<()> {
+        self.expression()?;
+        self.consume(TokenKind::Semicolon, b"Expect ';' after expression.")?;
+        self.emit_byte(OpCode::Pop);
+        Ok(())
+    }
+
+    fn print_statement(&mut self) -> eyre::Result<()> {
+        self.expression()?;
+        self.consume(TokenKind::Semicolon, b"Expect ';' after value.")?;
+        self.emit_byte(OpCode::Print);
+        Ok(())
+    }
+
+    fn declaration(&mut self) -> eyre::Result<()> {
+        self.statement()?;
+        Ok(())
+    }
+
+    fn statement(&mut self) -> eyre::Result<()> {
+        if self.matches(TokenKind::Print)? {
+            self.print_statement()?;
+        } else {
+            self.expression_statement()?;
+        }
+        Ok(())
+    }
+
     fn consume(&mut self, expected: TokenKind, message: &[u8]) -> eyre::Result<()> {
         if self.current.kind == expected {
             self.advance()?;
@@ -291,6 +321,19 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
 
         self.error_at_current(message)?;
         Ok(())
+    }
+
+    fn check(&mut self, kind: TokenKind) -> bool {
+        self.current.kind == kind
+    }
+
+    fn matches(&mut self, kind: TokenKind) -> eyre::Result<bool> {
+        if !self.check(kind) {
+            Ok(false)
+        } else {
+            self.advance()?;
+            Ok(true)
+        }
     }
 
     fn error_at_current(&mut self, message: &[u8]) -> eyre::Result<()> {
@@ -449,8 +492,11 @@ pub fn compile(source: &[u8], chunk: &mut crate::chunk::Chunk) -> eyre::Result<b
     let scanner = Scanner::new(source);
     let mut parser = Parser::new(scanner, chunk);
     parser.advance()?;
-    parser.expression()?;
-    parser.consume(TokenKind::Eof, b"Expect end of expression.")?;
+
+    while !parser.matches(TokenKind::Eof)? {
+        parser.declaration()?;
+    }
+
     parser.end_compiler();
     Ok(!parser.had_error)
 }

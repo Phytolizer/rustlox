@@ -25,6 +25,7 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             OpCode::Nil => simple_instruction("Nil", offset),
             OpCode::True => simple_instruction("True", offset),
             OpCode::False => simple_instruction("False", offset),
+            OpCode::Pop => simple_instruction("Pop", offset),
             OpCode::Equal => simple_instruction("Equal", offset),
             OpCode::Greater => simple_instruction("Greater", offset),
             OpCode::Less => simple_instruction("Less", offset),
@@ -34,6 +35,7 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             OpCode::Div => simple_instruction("Div", offset),
             OpCode::Not => simple_instruction("Not", offset),
             OpCode::Negate => simple_instruction("Negate", offset),
+            OpCode::Print => simple_instruction("Print", offset),
             OpCode::Return => simple_instruction("Return", offset),
         },
         Err(_) => {
