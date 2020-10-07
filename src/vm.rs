@@ -5,6 +5,7 @@ use crate::{
     common::DEBUG_TRACE_EXECUTION,
     compiler::compile,
     debug::disassemble_instruction,
+    object::Obj,
     value::Value,
 };
 
@@ -31,7 +32,7 @@ macro_rules! common_op {
         let a = $vm.stack.pop().unwrap();
 
         (a, b)
-    }}
+    }};
 }
 
 macro_rules! binary_op {
@@ -76,6 +77,15 @@ impl VM {
         self.chunk.as_ref().unwrap().constants[offset].clone()
     }
 
+    fn concatenate(&mut self) {
+        let mut b = self.stack.pop().unwrap().into_obj().into_string();
+        let mut a = self.stack.pop().unwrap().into_obj().into_string();
+        let mut result = vec![];
+        result.append(&mut a);
+        result.append(&mut b);
+        self.stack.push(Value::Obj(Box::new(Obj::String(result))));
+    }
+
     fn run(&mut self) -> InterpretResult {
         loop {
             if DEBUG_TRACE_EXECUTION {
@@ -102,7 +112,22 @@ impl VM {
                     }
                     OpCode::Greater => bool_op!(self, >),
                     OpCode::Less => bool_op!(self, <),
-                    OpCode::Add => binary_op!(self, +),
+                    OpCode::Add => {
+                        if self.stack[self.stack.len() - 1].is_string()
+                            && self.stack[self.stack.len() - 2].is_string()
+                        {
+                            self.concatenate();
+                        } else if self.stack[self.stack.len() - 1].is_number()
+                            && self.stack[self.stack.len() - 2].is_number()
+                        {
+                            let b = self.stack.pop().unwrap().as_number();
+                            let a = self.stack.pop().unwrap().as_number();
+                            self.stack.push(Value::Number(a + b));
+                        } else {
+                            self.runtime_error("Operands must be two numbers or two strings.");
+                            return InterpretResult::RuntimeError;
+                        }
+                    }
                     OpCode::Sub => binary_op!(self, -),
                     OpCode::Mul => binary_op!(self, *),
                     OpCode::Div => binary_op!(self, /),

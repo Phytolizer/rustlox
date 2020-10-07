@@ -16,12 +16,29 @@ pub enum Obj {
     String(Vec<u8>),
 }
 
+#[allow(irrefutable_let_patterns)]
 impl Obj {
     pub fn is_string(&self) -> bool {
         if let Obj::String(_) = self {
             true
         } else {
             false
+        }
+    }
+
+    pub fn as_string(&mut self) -> &mut Vec<u8> {
+        if let Obj::String(s) = self {
+            s
+        } else {
+            panic!("not a string");
+        }
+    }
+
+    pub fn into_string(self) -> Vec<u8> {
+        if let Obj::String(s) = self {
+            s
+        } else {
+            panic!("not a string");
         }
     }
 }

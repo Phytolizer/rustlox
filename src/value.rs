@@ -62,6 +62,22 @@ impl Value {
         }
     }
 
+    pub fn as_obj(&mut self) -> &mut Obj {
+        if let Self::Obj(o) = self {
+            o
+        } else {
+            panic!("not an object");
+        }
+    }
+
+    pub fn into_obj(self) -> Box<Obj> {
+        if let Self::Obj(o) = self {
+            o
+        } else {
+            panic!("not an object");
+        }
+    }
+
     pub fn is_falsey(&self) -> bool {
         self.is_nil() || (self.is_bool() && !self.as_bool())
     }
