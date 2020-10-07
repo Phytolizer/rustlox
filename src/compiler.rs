@@ -540,18 +540,21 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
         Ok(())
     }
 
-    fn resolve_local(&self, name: &Token) -> isize {
+    fn resolve_local(&mut self, name: &Token) -> eyre::Result<isize> {
         for i in 0..self.local_count {
             let local = &self.locals[i];
             if name.lexeme == local.name.lexeme {
-                return i as isize;
+                if local.depth == -1 {
+                    self.error(b"Can't read local variable in its own initializer.")?;
+                }
+                return Ok(i as isize);
             }
         }
-        -1
+        Ok(-1)
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) -> eyre::Result<()> {
-        let mut arg = self.resolve_local(name);
+        let mut arg = self.resolve_local(name)?;
         let get_op: OpCode;
         let set_op: OpCode;
         if arg != -1 {
