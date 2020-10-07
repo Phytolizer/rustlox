@@ -41,6 +41,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             OpCode::Not => simple_instruction("Not", offset),
             OpCode::Negate => simple_instruction("Negate", offset),
             OpCode::Print => simple_instruction("Print", offset),
+            OpCode::Jump => jump_instruction("Jump", 1, chunk, offset),
+            OpCode::JumpIfFalse => jump_instruction("JumpIfFalse", 1, chunk, offset),
+            OpCode::Loop => jump_instruction("Loop", -1, chunk, offset),
             OpCode::Return => simple_instruction("Return", offset),
         },
         Err(_) => {
@@ -48,6 +51,18 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             offset + 1
         }
     }
+}
+
+fn jump_instruction(name: &str, sign: isize, chunk: &Chunk, offset: usize) -> usize {
+    let mut jump = (chunk.code[offset + 1] as u16) << 8;
+    jump |= chunk.code[offset + 2] as u16;
+    println!(
+        "{:<16} {:4} -> {}",
+        name,
+        offset,
+        offset as isize + 3 + sign * jump as isize
+    );
+    offset + 3
 }
 
 fn byte_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {

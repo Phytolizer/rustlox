@@ -148,7 +148,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::And => ParseRule {
             prefix: None,
-            infix: None,
+            infix: Some(Compiler::and),
             precedence: Precedence::None,
         },
         TokenKind::Class => ParseRule {
@@ -188,7 +188,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::Or => ParseRule {
             prefix: None,
-            infix: None,
+            infix: Some(Compiler::or),
             precedence: Precedence::None,
         },
         TokenKind::Print => ParseRule {
@@ -320,10 +320,49 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
         Ok(())
     }
 
+    fn if_statement(&mut self) -> eyre::Result<()> {
+        self.consume(TokenKind::LeftParen, b"Expect '(' after 'if'.")?;
+        self.expression()?;
+        self.consume(TokenKind::RightParen, b"Expect ')' after condition.")?;
+
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+        self.statement()?;
+
+        let else_jump = self.emit_jump(OpCode::Jump);
+
+        self.patch_jump(then_jump)?;
+        self.emit_byte(OpCode::Pop);
+
+        if self.matches(TokenKind::Else)? {
+            self.statement()?;
+        }
+        self.patch_jump(else_jump)?;
+        Ok(())
+    }
+
     fn print_statement(&mut self) -> eyre::Result<()> {
         self.expression()?;
         self.consume(TokenKind::Semicolon, b"Expect ';' after value.")?;
         self.emit_byte(OpCode::Print);
+        Ok(())
+    }
+
+    fn while_statement(&mut self) -> eyre::Result<()> {
+        let loop_start = self.parser.current_chunk.code.len();
+        self.consume(TokenKind::LeftParen, b"Expect '(' after 'while'.")?;
+        self.expression()?;
+        self.consume(TokenKind::RightParen, b"Expect ')' after condition.")?;
+
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+
+        self.emit_byte(OpCode::Pop);
+        self.statement()?;
+
+        self.emit_loop(loop_start)?;
+
+        self.patch_jump(exit_jump)?;
+        self.emit_byte(OpCode::Pop);
         Ok(())
     }
 
@@ -371,6 +410,10 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
     fn statement(&mut self) -> eyre::Result<()> {
         if self.matches(TokenKind::Print)? {
             self.print_statement()?;
+        } else if self.matches(TokenKind::If)? {
+            self.if_statement()?;
+        } else if self.matches(TokenKind::While)? {
+            self.while_statement()?;
         } else if self.matches(TokenKind::LeftBrace)? {
             self.begin_scope();
             self.block()?;
@@ -447,6 +490,26 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
         self.emit_byte(byte2);
     }
 
+    fn emit_loop(&mut self, loop_start: usize) -> eyre::Result<()> {
+        self.emit_byte(OpCode::Loop);
+
+        let offset = self.parser.current_chunk.code.len() - loop_start + 2;
+        if offset > std::u16::MAX as usize {
+            self.error(b"Loop body too large")?;
+        }
+
+        self.emit_byte(((offset >> 8) & 0xff) as u8);
+        self.emit_byte((offset & 0xff) as u8);
+        Ok(())
+    }
+
+    fn emit_jump<B: Into<u8>>(&mut self, instruction: B) -> usize {
+        self.emit_byte(instruction);
+        self.emit_byte(0xff);
+        self.emit_byte(0xff);
+        self.parser.current_chunk.code.len() - 2
+    }
+
     fn emit_return(&mut self) {
         self.emit_byte(OpCode::Return);
     }
@@ -464,6 +527,17 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
     fn emit_constant(&mut self, constant: Value) -> eyre::Result<()> {
         let offset = self.make_constant(constant)?;
         self.emit_bytes(OpCode::Constant, offset);
+        Ok(())
+    }
+
+    fn patch_jump(&mut self, offset: usize) -> eyre::Result<()> {
+        let jump = self.parser.current_chunk.code.len() - offset - 2;
+        if jump > std::u16::MAX as usize {
+            self.error(b"Too much code to jump over.")?;
+        }
+
+        self.parser.current_chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
+        self.parser.current_chunk.code[offset + 1] = (jump & 0xff) as u8;
         Ok(())
     }
 
@@ -530,6 +604,17 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
     fn number(&mut self, _can_assign: bool) -> eyre::Result<()> {
         let value = String::from_utf8_lossy(&self.parser.previous.lexeme).parse::<f64>()?;
         self.emit_constant(Value::Number(value))?;
+        Ok(())
+    }
+
+    fn or(&mut self, __can_assign: bool) -> eyre::Result<()> {
+        let else_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::Jump);
+        self.patch_jump(else_jump)?;
+        self.emit_byte(OpCode::Pop);
+
+        self.parse_precedence(Precedence::Or)?;
+        self.patch_jump(end_jump)?;
         Ok(())
     }
 
@@ -674,6 +759,16 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
         }
 
         self.emit_bytes(OpCode::DefineGlobal, global);
+    }
+
+    fn and(&mut self, _can_assign: bool) -> eyre::Result<()> {
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+
+        self.emit_byte(OpCode::Pop);
+        self.parse_precedence(Precedence::And)?;
+
+        self.patch_jump(end_jump)?;
+        Ok(())
     }
 }
 

@@ -73,6 +73,13 @@ impl VM {
         byte
     }
 
+    fn read_short(&mut self) -> u16 {
+        self.ip += 2;
+        let byte1 = self.chunk.as_ref().unwrap().code[self.ip - 2];
+        let byte2 = self.chunk.as_ref().unwrap().code[self.ip - 1];
+        ((byte1 as u16) << 8) + byte2 as u16
+    }
+
     fn read_constant(&mut self) -> Value {
         let offset = self.read_byte() as usize;
         self.chunk.as_ref().unwrap().constants[offset].clone()
@@ -195,6 +202,20 @@ impl VM {
                         }
                     }
                     OpCode::Print => println!("{}", self.stack.pop().unwrap()),
+                    OpCode::Jump => {
+                        let offset = self.read_short();
+                        self.ip += offset as usize;
+                    }
+                    OpCode::JumpIfFalse => {
+                        let offset = self.read_short();
+                        if self.stack.last().unwrap().is_falsey() {
+                            self.ip += offset as usize;
+                        }
+                    }
+                    OpCode::Loop => {
+                        let offset = self.read_short();
+                        self.ip -= offset as usize;
+                    }
                     OpCode::Return => {
                         return InterpretResult::Ok;
                     }
