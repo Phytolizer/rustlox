@@ -623,10 +623,7 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
             return Ok(());
         }
 
-        let local = Local {
-            name,
-            depth: self.scope_depth as isize,
-        };
+        let local = Local { name, depth: -1 };
         self.locals.push(local);
         self.local_count += 1;
         Ok(())
@@ -663,8 +660,13 @@ impl<'source, 'chunk> Compiler<'source, 'chunk> {
         self.identifier_constant(&self.parser.previous.clone())
     }
 
+    fn mark_initialized(&mut self) {
+        self.locals[self.local_count - 1].depth = self.scope_depth as isize;
+    }
+
     fn define_variable(&mut self, global: u8) {
         if self.scope_depth > 0 {
+            self.mark_initialized();
             return;
         }
 
