@@ -26,6 +26,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             OpCode::True => simple_instruction("True", offset),
             OpCode::False => simple_instruction("False", offset),
             OpCode::Pop => simple_instruction("Pop", offset),
+            OpCode::GetLocal => byte_instruction("GetLocal", chunk, offset),
+            OpCode::SetLocal => byte_instruction("SetLocal", chunk, offset),
             OpCode::GetGlobal => constant_instruction("GetGlobal", chunk, offset),
             OpCode::DefineGlobal => constant_instruction("DefineGlobal", chunk, offset),
             OpCode::SetGlobal => constant_instruction("SetGlobal", chunk, offset),
@@ -46,6 +48,12 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
             offset + 1
         }
     }
+}
+
+fn byte_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+    let slot = chunk.code[offset + 1];
+    println!("{:<16} {:4}", name, slot);
+    offset + 2
 }
 
 fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {

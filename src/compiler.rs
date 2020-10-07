@@ -26,7 +26,7 @@ enum Precedence {
     Primary,
 }
 
-type ParseFn<'source, 'chunk> = fn(&mut Parser<'source, 'chunk>, bool) -> eyre::Result<()>;
+type ParseFn<'source, 'chunk> = fn(&mut Compiler<'source, 'chunk>, bool) -> eyre::Result<()>;
 
 struct ParseRule<'source, 'chunk> {
     prefix: Option<ParseFn<'source, 'chunk>>,
@@ -37,7 +37,7 @@ struct ParseRule<'source, 'chunk> {
 fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
     match kind {
         TokenKind::LeftParen => ParseRule {
-            prefix: Some(Parser::grouping),
+            prefix: Some(Compiler::grouping),
             infix: None,
             precedence: Precedence::None,
         },
@@ -67,13 +67,13 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::Minus => ParseRule {
-            prefix: Some(Parser::unary),
-            infix: Some(Parser::binary),
+            prefix: Some(Compiler::unary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Term,
         },
         TokenKind::Plus => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Term,
         },
         TokenKind::Semicolon => ParseRule {
@@ -83,22 +83,22 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::Slash => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Factor,
         },
         TokenKind::Star => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Factor,
         },
         TokenKind::Bang => ParseRule {
-            prefix: Some(Parser::unary),
+            prefix: Some(Compiler::unary),
             infix: None,
             precedence: Precedence::None,
         },
         TokenKind::BangEqual => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Equality,
         },
         TokenKind::Equal => ParseRule {
@@ -108,41 +108,41 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
         },
         TokenKind::EqualEqual => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Equality,
         },
         TokenKind::Less => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Comparison,
         },
         TokenKind::LessEqual => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Comparison,
         },
         TokenKind::Greater => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Comparison,
         },
         TokenKind::GreaterEqual => ParseRule {
             prefix: None,
-            infix: Some(Parser::binary),
+            infix: Some(Compiler::binary),
             precedence: Precedence::Comparison,
         },
         TokenKind::Identifier => ParseRule {
-            prefix: Some(Parser::variable),
+            prefix: Some(Compiler::variable),
             infix: None,
             precedence: Precedence::None,
         },
         TokenKind::String => ParseRule {
-            prefix: Some(Parser::string),
+            prefix: Some(Compiler::string),
             infix: None,
             precedence: Precedence::None,
         },
         TokenKind::Number => ParseRule {
-            prefix: Some(Parser::number),
+            prefix: Some(Compiler::number),
             infix: None,
             precedence: Precedence::None,
         },
@@ -162,7 +162,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::False => ParseRule {
-            prefix: Some(Parser::literal),
+            prefix: Some(Compiler::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -182,7 +182,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::Nil => ParseRule {
-            prefix: Some(Parser::literal),
+            prefix: Some(Compiler::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -212,7 +212,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::True => ParseRule {
-            prefix: Some(Parser::literal),
+            prefix: Some(Compiler::literal),
             infix: None,
             precedence: Precedence::None,
         },
@@ -267,22 +267,33 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             current_chunk: chunk,
         }
     }
+}
 
+impl<'source, 'chunk> Compiler<'source, 'chunk> {
     fn advance(&mut self) -> eyre::Result<()> {
-        self.previous = self.current.clone();
+        self.parser.previous = self.parser.current.clone();
         loop {
-            self.current = self.scanner.scan_token();
-            if self.current.kind != TokenKind::Error {
+            self.parser.current = self.parser.scanner.scan_token();
+            if self.parser.current.kind != TokenKind::Error {
                 break;
             }
 
-            self.error_at_current(&self.current.lexeme.clone())?;
+            self.error_at_current(&self.parser.current.lexeme.clone())?;
         }
         Ok(())
     }
 
     fn expression(&mut self) -> eyre::Result<()> {
         self.parse_precedence(Precedence::Assignment)
+    }
+
+    fn block(&mut self) -> eyre::Result<()> {
+        while !self.check(TokenKind::RightBrace) && !self.check(TokenKind::Eof) {
+            self.declaration()?;
+        }
+
+        self.consume(TokenKind::RightBrace, b"Expect '}' after block.")?;
+        Ok(())
     }
 
     fn var_declaration(&mut self) -> eyre::Result<()> {
@@ -317,14 +328,14 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn synchronize(&mut self) -> eyre::Result<()> {
-        self.panic_mode = false;
+        self.parser.panic_mode = false;
 
-        while self.current.kind != TokenKind::Eof {
-            if self.previous.kind == TokenKind::Semicolon {
+        while self.parser.current.kind != TokenKind::Eof {
+            if self.parser.previous.kind == TokenKind::Semicolon {
                 return Ok(());
             }
 
-            match self.current.kind {
+            match self.parser.current.kind {
                 TokenKind::Class
                 | TokenKind::Fun
                 | TokenKind::Var
@@ -350,7 +361,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             self.statement()?;
         }
 
-        if self.panic_mode {
+        if self.parser.panic_mode {
             self.synchronize()?;
         }
 
@@ -360,6 +371,10 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     fn statement(&mut self) -> eyre::Result<()> {
         if self.matches(TokenKind::Print)? {
             self.print_statement()?;
+        } else if self.matches(TokenKind::LeftBrace)? {
+            self.begin_scope();
+            self.block()?;
+            self.end_scope();
         } else {
             self.expression_statement()?;
         }
@@ -367,7 +382,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn consume(&mut self, expected: TokenKind, message: &[u8]) -> eyre::Result<()> {
-        if self.current.kind == expected {
+        if self.parser.current.kind == expected {
             self.advance()?;
             return Ok(());
         }
@@ -377,7 +392,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn check(&mut self, kind: TokenKind) -> bool {
-        self.current.kind == kind
+        self.parser.current.kind == kind
     }
 
     fn matches(&mut self, kind: TokenKind) -> eyre::Result<bool> {
@@ -390,20 +405,20 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn error_at_current(&mut self, message: &[u8]) -> eyre::Result<()> {
-        self.error_at(&self.current.clone(), message)?;
+        self.error_at(&self.parser.current.clone(), message)?;
         Ok(())
     }
 
     fn error(&mut self, message: &[u8]) -> eyre::Result<()> {
-        self.error_at(&self.previous.clone(), message)?;
+        self.error_at(&self.parser.previous.clone(), message)?;
         Ok(())
     }
 
     fn error_at(&mut self, token: &Token, message: &[u8]) -> eyre::Result<()> {
-        if self.panic_mode {
+        if self.parser.panic_mode {
             return Ok(());
         }
-        self.panic_mode = true;
+        self.parser.panic_mode = true;
         eprint!("[line {}] Error", token.line);
         if token.kind == TokenKind::Eof {
             eprint!(" at end");
@@ -417,12 +432,14 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         std::io::stderr().write_all(message)?;
         eprintln!();
 
-        self.had_error = true;
+        self.parser.had_error = true;
         Ok(())
     }
 
     fn emit_byte<B: Into<u8>>(&mut self, byte: B) {
-        self.current_chunk.write(byte, self.previous.line);
+        self.parser
+            .current_chunk
+            .write(byte, self.parser.previous.line);
     }
 
     fn emit_bytes<B1: Into<u8>, B2: Into<u8>>(&mut self, byte1: B1, byte2: B2) {
@@ -435,7 +452,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn make_constant(&mut self, value: Value) -> eyre::Result<u8> {
-        let constant = self.current_chunk.add_constant(value);
+        let constant = self.parser.current_chunk.add_constant(value);
         if constant > std::u8::MAX as usize {
             self.error(b"Too many constants in one chunk.")?;
             Ok(0)
@@ -452,13 +469,28 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
 
     fn end_compiler(&mut self) {
         self.emit_return();
-        if DEBUG_PRINT_CODE && !self.had_error {
-            disassemble_chunk(&self.current_chunk, "code");
+        if DEBUG_PRINT_CODE && !self.parser.had_error {
+            disassemble_chunk(&self.parser.current_chunk, "code");
+        }
+    }
+
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        while self.local_count > 0
+            && self.locals[self.local_count - 1].depth > self.scope_depth as isize
+        {
+            self.emit_byte(OpCode::Pop);
+            self.local_count -= 1;
         }
     }
 
     fn binary(&mut self, _can_assign: bool) -> eyre::Result<()> {
-        let operator_kind = self.previous.kind;
+        let operator_kind = self.parser.previous.kind;
 
         let rule = get_rule(operator_kind);
         self.parse_precedence(Precedence::try_from(rule.precedence as usize + 1).unwrap())?;
@@ -480,7 +512,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn literal(&mut self, _can_assign: bool) -> eyre::Result<()> {
-        match self.previous.kind {
+        match self.parser.previous.kind {
             TokenKind::False => self.emit_byte(OpCode::False),
             TokenKind::Nil => self.emit_byte(OpCode::Nil),
             TokenKind::True => self.emit_byte(OpCode::True),
@@ -496,36 +528,56 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn number(&mut self, _can_assign: bool) -> eyre::Result<()> {
-        let value = String::from_utf8_lossy(&self.previous.lexeme).parse::<f64>()?;
+        let value = String::from_utf8_lossy(&self.parser.previous.lexeme).parse::<f64>()?;
         self.emit_constant(Value::Number(value))?;
         Ok(())
     }
 
     fn string(&mut self, _can_assign: bool) -> eyre::Result<()> {
         self.emit_constant(Value::Obj(Box::new(Obj::String(
-            self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_owned(),
+            self.parser.previous.lexeme[1..self.parser.previous.lexeme.len() - 1].to_owned(),
         ))))?;
         Ok(())
     }
 
+    fn resolve_local(&self, name: &Token) -> isize {
+        for i in 0..self.local_count {
+            let local = &self.locals[i];
+            if name.lexeme == local.name.lexeme {
+                return i as isize;
+            }
+        }
+        -1
+    }
+
     fn named_variable(&mut self, name: &Token, can_assign: bool) -> eyre::Result<()> {
-        let arg = self.identifier_constant(name)?;
+        let mut arg = self.resolve_local(name);
+        let get_op: OpCode;
+        let set_op: OpCode;
+        if arg != -1 {
+            get_op = OpCode::GetLocal;
+            set_op = OpCode::SetLocal;
+        } else {
+            arg = self.identifier_constant(name)? as isize;
+            get_op = OpCode::GetGlobal;
+            set_op = OpCode::SetGlobal;
+        }
 
         if can_assign && self.matches(TokenKind::Equal)? {
             self.expression()?;
-            self.emit_bytes(OpCode::SetGlobal, arg);
+            self.emit_bytes(set_op, arg as u8);
         } else {
-            self.emit_bytes(OpCode::GetGlobal, arg);
+            self.emit_bytes(get_op, arg as u8);
         }
         Ok(())
     }
 
     fn variable(&mut self, can_assign: bool) -> eyre::Result<()> {
-        self.named_variable(&self.previous.clone(), can_assign)
+        self.named_variable(&self.parser.previous.clone(), can_assign)
     }
 
     fn unary(&mut self, _can_assign: bool) -> eyre::Result<()> {
-        let operator_kind = self.previous.kind;
+        let operator_kind = self.parser.previous.kind;
 
         self.parse_precedence(Precedence::Unary)?;
 
@@ -539,7 +591,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
 
     fn parse_precedence(&mut self, precedence: Precedence) -> eyre::Result<()> {
         self.advance()?;
-        let prefix_rule = get_rule(self.previous.kind).prefix;
+        let prefix_rule = get_rule(self.parser.previous.kind).prefix;
         let can_assign = precedence <= Precedence::Assignment;
         match prefix_rule {
             None => {
@@ -548,9 +600,9 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             Some(prefix_rule) => prefix_rule(self, can_assign)?,
         }
 
-        while precedence <= get_rule(self.current.kind).precedence {
+        while precedence <= get_rule(self.parser.current.kind).precedence {
             self.advance()?;
-            if let Some(infix_rule) = get_rule(self.previous.kind).infix {
+            if let Some(infix_rule) = get_rule(self.parser.previous.kind).infix {
                 infix_rule(self, can_assign)?;
             }
         }
@@ -565,25 +617,95 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         self.make_constant(Value::Obj(Box::new(Obj::String(name.lexeme.clone()))))
     }
 
+    fn add_local(&mut self, name: Token) -> eyre::Result<()> {
+        if self.locals.len() == std::u8::MAX as usize + 1 {
+            self.error(b"Too many local variables in function.")?;
+            return Ok(());
+        }
+
+        let local = Local {
+            name,
+            depth: self.scope_depth as isize,
+        };
+        self.locals.push(local);
+        self.local_count += 1;
+        Ok(())
+    }
+
+    fn declare_variable(&mut self) -> eyre::Result<()> {
+        if self.scope_depth == 0 {
+            return Ok(());
+        }
+
+        let name = &self.parser.previous;
+        for local in self.locals.iter().rev() {
+            if local.depth != -1 && local.depth < self.scope_depth as isize {
+                break;
+            }
+            if name.lexeme == local.name.lexeme {
+                self.error(b"Already a variable with this name in this scope.")?;
+                return Ok(());
+            }
+        }
+        let name = name.clone();
+        self.add_local(name)?;
+        Ok(())
+    }
+
     fn parse_variable(&mut self, error_message: &[u8]) -> eyre::Result<u8> {
         self.consume(TokenKind::Identifier, error_message)?;
-        self.identifier_constant(&self.previous.clone())
+
+        self.declare_variable()?;
+        if self.scope_depth > 0 {
+            return Ok(0);
+        }
+
+        self.identifier_constant(&self.parser.previous.clone())
     }
 
     fn define_variable(&mut self, global: u8) {
+        if self.scope_depth > 0 {
+            return;
+        }
+
         self.emit_bytes(OpCode::DefineGlobal, global);
     }
 }
 
+pub struct Compiler<'source, 'chunk> {
+    locals: Vec<Local>,
+    local_count: usize,
+    scope_depth: usize,
+    parser: Parser<'source, 'chunk>,
+}
+
+impl<'source, 'chunk> Compiler<'source, 'chunk> {
+    fn new(parser: Parser<'source, 'chunk>) -> Self {
+        Self {
+            locals: Vec::with_capacity(std::u8::MAX as usize + 1),
+            local_count: 0,
+            scope_depth: 0,
+            parser,
+        }
+    }
+}
+
+#[derive(Default)]
+struct Local {
+    name: Token,
+    depth: isize,
+}
+
 pub fn compile(source: &[u8], chunk: &mut crate::chunk::Chunk) -> eyre::Result<bool> {
     let scanner = Scanner::new(source);
-    let mut parser = Parser::new(scanner, chunk);
-    parser.advance()?;
+    let parser = Parser::new(scanner, chunk);
+    let mut compiler = Compiler::new(parser);
+    compiler.advance()?;
 
-    while !parser.matches(TokenKind::Eof)? {
-        parser.declaration()?;
+    while !compiler.matches(TokenKind::Eof)? {
+        compiler.declaration()?;
     }
 
-    parser.end_compiler();
-    Ok(!parser.had_error)
+    compiler.end_compiler();
+    Ok(!compiler.parser.had_error)
 }

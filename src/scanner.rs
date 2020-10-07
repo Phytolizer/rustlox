@@ -64,6 +64,16 @@ pub struct Token {
     pub line: usize,
 }
 
+impl Default for Token {
+    fn default() -> Self {
+        Self {
+            kind: TokenKind::Error,
+            lexeme: vec![],
+            line: 0,
+        }
+    }
+}
+
 impl<'source> Scanner<'source> {
     pub fn new(source: &'source [u8]) -> Self {
         Self {
