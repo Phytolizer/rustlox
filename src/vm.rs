@@ -131,6 +131,21 @@ impl VM {
                             .insert(name, self.stack.last().unwrap().clone());
                         self.stack.pop();
                     }
+                    OpCode::SetGlobal => {
+                        let name = self.read_string();
+                        if self
+                            .globals
+                            .insert(name.clone(), self.stack.last().unwrap().clone())
+                            .is_none()
+                        {
+                            self.globals.remove(&name);
+                            self.runtime_error(&format!(
+                                "Undefined variable '{}'.",
+                                String::from_utf8_lossy(&name)
+                            ));
+                            return InterpretResult::RuntimeError;
+                        }
+                    }
                     OpCode::Equal => {
                         let b = self.stack.pop().unwrap();
                         let a = self.stack.pop().unwrap();

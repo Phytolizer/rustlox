@@ -26,7 +26,7 @@ enum Precedence {
     Primary,
 }
 
-type ParseFn<'source, 'chunk> = fn(&mut Parser<'source, 'chunk>) -> eyre::Result<()>;
+type ParseFn<'source, 'chunk> = fn(&mut Parser<'source, 'chunk>, bool) -> eyre::Result<()>;
 
 struct ParseRule<'source, 'chunk> {
     prefix: Option<ParseFn<'source, 'chunk>>,
@@ -457,7 +457,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         }
     }
 
-    fn binary(&mut self) -> eyre::Result<()> {
+    fn binary(&mut self, _can_assign: bool) -> eyre::Result<()> {
         let operator_kind = self.previous.kind;
 
         let rule = get_rule(operator_kind);
@@ -479,7 +479,7 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         Ok(())
     }
 
-    fn literal(&mut self) -> eyre::Result<()> {
+    fn literal(&mut self, _can_assign: bool) -> eyre::Result<()> {
         match self.previous.kind {
             TokenKind::False => self.emit_byte(OpCode::False),
             TokenKind::Nil => self.emit_byte(OpCode::Nil),
@@ -489,36 +489,42 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         Ok(())
     }
 
-    fn grouping(&mut self) -> eyre::Result<()> {
+    fn grouping(&mut self, _can_assign: bool) -> eyre::Result<()> {
         self.expression()?;
         self.consume(TokenKind::RightParen, b"Expect ')' after expression.")?;
         Ok(())
     }
 
-    fn number(&mut self) -> eyre::Result<()> {
+    fn number(&mut self, _can_assign: bool) -> eyre::Result<()> {
         let value = String::from_utf8_lossy(&self.previous.lexeme).parse::<f64>()?;
         self.emit_constant(Value::Number(value))?;
         Ok(())
     }
 
-    fn string(&mut self) -> eyre::Result<()> {
+    fn string(&mut self, _can_assign: bool) -> eyre::Result<()> {
         self.emit_constant(Value::Obj(Box::new(Obj::String(
             self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_owned(),
         ))))?;
         Ok(())
     }
 
-    fn named_variable(&mut self, name: &Token) -> eyre::Result<()> {
+    fn named_variable(&mut self, name: &Token, can_assign: bool) -> eyre::Result<()> {
         let arg = self.identifier_constant(name)?;
-        self.emit_bytes(OpCode::GetGlobal, arg);
+
+        if can_assign && self.matches(TokenKind::Equal)? {
+            self.expression()?;
+            self.emit_bytes(OpCode::SetGlobal, arg);
+        } else {
+            self.emit_bytes(OpCode::GetGlobal, arg);
+        }
         Ok(())
     }
 
-    fn variable(&mut self) -> eyre::Result<()> {
-        self.named_variable(&self.previous.clone())
+    fn variable(&mut self, can_assign: bool) -> eyre::Result<()> {
+        self.named_variable(&self.previous.clone(), can_assign)
     }
 
-    fn unary(&mut self) -> eyre::Result<()> {
+    fn unary(&mut self, _can_assign: bool) -> eyre::Result<()> {
         let operator_kind = self.previous.kind;
 
         self.parse_precedence(Precedence::Unary)?;
@@ -534,18 +540,23 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     fn parse_precedence(&mut self, precedence: Precedence) -> eyre::Result<()> {
         self.advance()?;
         let prefix_rule = get_rule(self.previous.kind).prefix;
+        let can_assign = precedence <= Precedence::Assignment;
         match prefix_rule {
             None => {
                 self.error(b"Expect expression.")?;
             }
-            Some(prefix_rule) => prefix_rule(self)?,
+            Some(prefix_rule) => prefix_rule(self, can_assign)?,
         }
 
         while precedence <= get_rule(self.current.kind).precedence {
             self.advance()?;
             if let Some(infix_rule) = get_rule(self.previous.kind).infix {
-                infix_rule(self)?;
+                infix_rule(self, can_assign)?;
             }
+        }
+
+        if can_assign && self.matches(TokenKind::Equal)? {
+            self.error(b"Invalid assignment target.")?;
         }
         Ok(())
     }
