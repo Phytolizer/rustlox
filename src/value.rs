@@ -3,11 +3,14 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-#[derive(Copy, Clone)]
+use crate::object::Obj;
+
+#[derive(Clone)]
 pub enum Value {
     Bool(bool),
     Nil,
     Number(f64),
+    Obj(Box<Obj>),
 }
 
 impl Value {
@@ -35,6 +38,14 @@ impl Value {
         }
     }
 
+    pub fn is_obj(&self) -> bool {
+        if let Self::Obj(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn as_bool(&self) -> bool {
         if let Self::Bool(b) = self {
             *b
@@ -50,6 +61,7 @@ impl Value {
             panic!("not a number");
         }
     }
+
     pub fn is_falsey(&self) -> bool {
         self.is_nil() || (self.is_bool() && !self.as_bool())
     }
@@ -61,6 +73,7 @@ impl Display for Value {
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
             Self::Number(n) => write!(f, "{}", n),
+            Self::Obj(o) => write!(f, "{}", o),
         }
     }
 }
@@ -108,9 +121,18 @@ impl Div for Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Value::Bool(b) => other.is_bool() && *b == other.as_bool(),
-            Value::Nil => other.is_nil(),
-            Value::Number(n) => other.is_number() && *n == other.as_number(),
+            Self::Bool(b) => other.is_bool() && *b == other.as_bool(),
+            Self::Nil => other.is_nil(),
+            Self::Number(n) => other.is_number() && *n == other.as_number(),
+            Self::Obj(o) => {
+                let Obj::String(a) = o as &Obj;
+                if let Value::Obj(other) = other {
+                    let Obj::String(b) = other as &Obj;
+                    a == b
+                } else {
+                    false
+                }
+            }
         }
     }
 }

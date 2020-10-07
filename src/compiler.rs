@@ -5,6 +5,7 @@ use crate::{
     chunk::OpCode,
     common::DEBUG_PRINT_CODE,
     debug::disassemble_chunk,
+    object::Obj,
     scanner::{Scanner, Token, TokenKind},
     value::Value,
 };
@@ -136,7 +137,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::None,
         },
         TokenKind::String => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::string),
             infix: None,
             precedence: Precedence::None,
         },
@@ -401,6 +402,13 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     fn number(&mut self) -> eyre::Result<()> {
         let value = String::from_utf8_lossy(&self.previous.lexeme).parse::<f64>()?;
         self.emit_constant(Value::Number(value))?;
+        Ok(())
+    }
+
+    fn string(&mut self) -> eyre::Result<()> {
+        self.emit_constant(Value::Obj(Box::new(Obj::String(
+            self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_owned(),
+        ))))?;
         Ok(())
     }
 

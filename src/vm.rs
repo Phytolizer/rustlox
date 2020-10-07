@@ -73,7 +73,7 @@ impl VM {
 
     fn read_constant(&mut self) -> Value {
         let offset = self.read_byte() as usize;
-        self.chunk.as_ref().unwrap().constants[offset]
+        self.chunk.as_ref().unwrap().constants[offset].clone()
     }
 
     fn run(&mut self) -> InterpretResult {
