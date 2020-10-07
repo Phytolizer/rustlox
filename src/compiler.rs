@@ -299,8 +299,40 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         Ok(())
     }
 
+    fn synchronize(&mut self) -> eyre::Result<()> {
+        self.panic_mode = false;
+
+        while self.current.kind != TokenKind::Eof {
+            if self.previous.kind == TokenKind::Semicolon {
+                return Ok(());
+            }
+
+            match self.current.kind {
+                TokenKind::Class
+                | TokenKind::Fun
+                | TokenKind::Var
+                | TokenKind::For
+                | TokenKind::If
+                | TokenKind::While
+                | TokenKind::Print
+                | TokenKind::Return => {
+                    return Ok(());
+                }
+                _ => {}
+            }
+
+            self.advance()?;
+        }
+        Ok(())
+    }
+
     fn declaration(&mut self) -> eyre::Result<()> {
         self.statement()?;
+
+        if self.panic_mode {
+            self.synchronize();
+        }
+
         Ok(())
     }
 
