@@ -113,6 +113,18 @@ impl VM {
                     OpCode::Pop => {
                         self.stack.pop();
                     }
+                    OpCode::GetGlobal => {
+                        let name = self.read_string();
+                        if let Some(value) = self.globals.get(&name) {
+                            self.stack.push(value.clone());
+                        } else {
+                            self.runtime_error(&format!(
+                                "Undefined variable '{}'",
+                                String::from_utf8_lossy(&name)
+                            ));
+                            return InterpretResult::RuntimeError;
+                        }
+                    }
                     OpCode::DefineGlobal => {
                         let name = self.read_string();
                         self.globals

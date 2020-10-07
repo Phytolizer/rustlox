@@ -132,7 +132,7 @@ fn get_rule<'source, 'chunk>(kind: TokenKind) -> ParseRule<'source, 'chunk> {
             precedence: Precedence::Comparison,
         },
         TokenKind::Identifier => ParseRule {
-            prefix: None,
+            prefix: Some(Parser::variable),
             infix: None,
             precedence: Precedence::None,
         },
@@ -506,6 +506,16 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_owned(),
         ))))?;
         Ok(())
+    }
+
+    fn named_variable(&mut self, name: &Token) -> eyre::Result<()> {
+        let arg = self.identifier_constant(name)?;
+        self.emit_bytes(OpCode::GetGlobal, arg);
+        Ok(())
+    }
+
+    fn variable(&mut self) -> eyre::Result<()> {
+        self.named_variable(&self.previous.clone())
     }
 
     fn unary(&mut self) -> eyre::Result<()> {
