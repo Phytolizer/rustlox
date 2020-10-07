@@ -285,6 +285,23 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
         self.parse_precedence(Precedence::Assignment)
     }
 
+    fn var_declaration(&mut self) -> eyre::Result<()> {
+        let global = self.parse_variable(b"Expect variable name.")?;
+
+        if self.matches(TokenKind::Equal)? {
+            self.expression()?;
+        } else {
+            self.emit_byte(OpCode::Nil);
+        }
+        self.consume(
+            TokenKind::Semicolon,
+            b"Expect ';' after variable declaration.",
+        )?;
+
+        self.define_variable(global);
+        Ok(())
+    }
+
     fn expression_statement(&mut self) -> eyre::Result<()> {
         self.expression()?;
         self.consume(TokenKind::Semicolon, b"Expect ';' after expression.")?;
@@ -327,10 +344,14 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
     }
 
     fn declaration(&mut self) -> eyre::Result<()> {
-        self.statement()?;
+        if self.matches(TokenKind::Var)? {
+            self.var_declaration()?;
+        } else {
+            self.statement()?;
+        }
 
         if self.panic_mode {
-            self.synchronize();
+            self.synchronize()?;
         }
 
         Ok(())
@@ -517,6 +538,19 @@ impl<'source, 'chunk> Parser<'source, 'chunk> {
             }
         }
         Ok(())
+    }
+
+    fn identifier_constant(&mut self, name: &Token) -> eyre::Result<u8> {
+        self.make_constant(Value::Obj(Box::new(Obj::String(name.lexeme.clone()))))
+    }
+
+    fn parse_variable(&mut self, error_message: &[u8]) -> eyre::Result<u8> {
+        self.consume(TokenKind::Identifier, error_message)?;
+        self.identifier_constant(&self.previous.clone())
+    }
+
+    fn define_variable(&mut self, global: u8) {
+        self.emit_bytes(OpCode::DefineGlobal, global);
     }
 }
 

@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use crate::{
     chunk::{Chunk, OpCode},
@@ -14,6 +14,7 @@ pub struct VM {
     pub chunk: Option<Box<Chunk>>,
     ip: usize,
     stack: Vec<Value>,
+    globals: HashMap<Vec<u8>, Value>,
 }
 
 pub enum InterpretResult {
@@ -77,6 +78,10 @@ impl VM {
         self.chunk.as_ref().unwrap().constants[offset].clone()
     }
 
+    fn read_string(&mut self) -> Vec<u8> {
+        self.read_constant().into_obj().into_string()
+    }
+
     fn concatenate(&mut self) {
         let mut b = self.stack.pop().unwrap().into_obj().into_string();
         let mut a = self.stack.pop().unwrap().into_obj().into_string();
@@ -106,6 +111,12 @@ impl VM {
                     OpCode::True => self.stack.push(Value::Bool(true)),
                     OpCode::False => self.stack.push(Value::Bool(false)),
                     OpCode::Pop => {
+                        self.stack.pop();
+                    }
+                    OpCode::DefineGlobal => {
+                        let name = self.read_string();
+                        self.globals
+                            .insert(name, self.stack.last().unwrap().clone());
                         self.stack.pop();
                     }
                     OpCode::Equal => {
