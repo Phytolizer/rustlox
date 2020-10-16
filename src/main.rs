@@ -71,7 +71,7 @@ fn run(source: &str) {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse();
+    let statements = parser.parse();
 
     if *HAD_ERROR.read().unwrap() {
         return;
@@ -80,7 +80,7 @@ fn run(source: &str) {
     INTERPRETER
         .write()
         .unwrap()
-        .interpret(expression.as_ref().unwrap());
+        .interpret(statements.as_ref().unwrap());
 }
 
 pub fn error(line: usize, message: &str) {

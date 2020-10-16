@@ -1,4 +1,15 @@
-use crate::{expr::Binary, expr::Expr, expr::Grouping, expr::Literal, expr::Unary, object::Object, stmt::Stmt, token::{Token, TokenKind}};
+use crate::{
+    expr::Binary,
+    expr::Expr,
+    expr::Grouping,
+    expr::Literal,
+    expr::Unary,
+    object::Object,
+    stmt::Expression,
+    stmt::Print,
+    stmt::Stmt,
+    token::{Token, TokenKind},
+};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -10,17 +21,17 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Vec<Stmt> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, (Token, String)> {
         let mut statements = vec![];
 
         while !self.at_end() {
-            statements.push(self.statement());
+            statements.push(self.statement()?);
         }
 
-        statements
+        Ok(statements)
     }
 
-    fn statement(&mut self) -> Stmt {
+    fn statement(&mut self) -> Result<Stmt, (Token, String)> {
         if self.matches(vec![TokenKind::Print]) {
             return self.print_statement();
         }
@@ -28,16 +39,16 @@ impl Parser {
         self.expression_statement()
     }
 
-    fn print_statement(&mut self) -> Stmt {
-        let value = self.expression();
-        self.consume(TokenKind::Semicolon, "Expect ';' after value.");
-        Stmt::Print(value)
+    fn print_statement(&mut self) -> Result<Stmt, (Token, String)> {
+        let value = self.expression()?;
+        self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Print(Print { expression: value }))
     }
 
-    fn expression_statement(&mut self) -> Stmt {
-        let expr = self.expression();
-        self.consume(TokenKind::Semicolon, "Expect ';' after expression.");
-        Stmt::Expression(expr)
+    fn expression_statement(&mut self) -> Result<Stmt, (Token, String)> {
+        let expr = self.expression()?;
+        self.consume(TokenKind::Semicolon, "Expect ';' after expression.")?;
+        Ok(Stmt::Expression(Expression { expression: expr }))
     }
 
     fn expression(&mut self) -> Result<Expr, (Token, String)> {

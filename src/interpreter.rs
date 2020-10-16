@@ -44,10 +44,9 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, statements: &[stmt::Stmt]) {
-        statements
-            .iter()
-            .find_map(|s| self.execute(s).err())
-            .map(|e| crate::runtime_error(e));
+        if let Some(e) = statements.iter().find_map(|s| self.execute(s).err()) {
+            crate::runtime_error(e);
+        }
     }
 
     fn execute(&mut self, stmt: &stmt::Stmt) -> Result<(), RuntimeError> {
@@ -59,14 +58,15 @@ impl Interpreter {
     }
 }
 
-impl stmt::Visitor<()> for Interpreter {
-    fn visit_expression_stmt(&mut self, stmt: &stmt::Expression) {
-        self.evaluate(&stmt.expression);
+impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
+    fn visit_expression_stmt(&mut self, stmt: &stmt::Expression) -> Result<(), RuntimeError> {
+        self.evaluate(&stmt.expression).map(|_| ())
     }
 
-    fn visit_print_stmt(&mut self, stmt: &stmt::Print) {
-        let value = self.evaluate(&stmt.expression);
+    fn visit_print_stmt(&mut self, stmt: &stmt::Print) -> Result<(), RuntimeError> {
+        let value = self.evaluate(&stmt.expression)?;
         println!("{}", value);
+        Ok(())
     }
 }
 
