@@ -1,4 +1,4 @@
-use crate::expr::{self, Expr, Visitor};
+use crate::expr::{self, Expr};
 
 pub struct AstPrinter {}
 
