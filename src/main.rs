@@ -1,77 +1,110 @@
-pub mod chunk;
-pub mod common;
-pub mod compiler;
-pub mod debug;
-pub mod object;
-pub mod scanner;
-pub mod value;
-pub mod vm;
+mod ast_printer;
+mod expr;
+mod interpreter;
+mod object;
+mod parser;
+mod runtime_error;
+mod scanner;
+mod stmt;
+mod token;
+
+use lazy_static::lazy_static;
+use parser::Parser;
+use scanner::Scanner;
+use token::{Token, TokenKind};
 
 use std::{
-    ffi::OsString,
-    io::Write,
-    io::{self, BufRead, Read},
-    process::exit,
+    io::{BufRead, Write},
+    sync::RwLock,
 };
 
-use vm::{InterpretResult, VM};
+lazy_static! {
+    static ref HAD_ERROR: RwLock<bool> = RwLock::new(false);
+    static ref HAD_RUNTIME_ERROR: RwLock<bool> = RwLock::new(false);
+    static ref INTERPRETER: RwLock<interpreter::Interpreter> =
+        RwLock::new(interpreter::Interpreter::new());
+}
 
 fn main() {
-    let mut vm = VM::new();
-
-    let args: Vec<OsString> = std::env::args_os().collect();
+    let args = std::env::args().collect::<Vec<_>>();
 
     match args.len() {
-        1 => {
-            if let Err(e) = repl(&mut vm) {
-                eprintln!("Fatal error: {}", e);
-            }
-        }
-        2 => {
-            if let Err(e) = run_file(&mut vm, &args[1]) {
-                eprintln!("Fatal error: {}", e);
-            }
-        }
+        1 => run_prompt().unwrap(),
+        2 => run_file(&args[1]).unwrap(),
         _ => {
-            eprintln!("Usage: clox [path]");
-            exit(64);
+            println!("Usage: jlox [script]");
+            std::process::exit(64);
         }
     }
 }
 
-fn repl(vm: &mut VM) -> eyre::Result<()> {
-    let stdin = io::stdin();
-    let mut stdin_reader = stdin.lock();
+fn run_file(name: &str) -> Result<(), std::io::Error> {
+    let source = std::fs::read_to_string(name)?;
+    run(&source);
+
+    if *HAD_ERROR.read().unwrap() {
+        std::process::exit(65);
+    }
+    if *HAD_RUNTIME_ERROR.read().unwrap() {
+        std::process::exit(70);
+    }
+    Ok(())
+}
+
+fn run_prompt() -> Result<(), std::io::Error> {
+    let stdin = std::io::stdin();
+    let mut reader = std::io::BufReader::new(stdin);
     loop {
-        let mut line = vec![];
         print!("> ");
-        io::stdout().flush()?;
-
-        match stdin_reader.read_until(b'\n', &mut line)? {
-            0 => {
-                println!();
-                break;
-            }
-            _ => {
-                vm.interpret(&line)?;
-            }
+        std::io::stdout().flush()?;
+        let mut line = String::new();
+        if let Ok(0) = reader.read_line(&mut line) {
+            break;
         }
+        run(&line);
+        *HAD_ERROR.write().unwrap() = false;
     }
     Ok(())
 }
 
-fn run_file(vm: &mut VM, file_name: &OsString) -> eyre::Result<()> {
-    let source = {
-        let mut source = vec![];
-        let mut f = std::fs::File::open(&file_name)?;
-        f.read_to_end(&mut source)?;
-        source
-    };
+fn run(source: &str) {
+    let mut scanner = Scanner::new(source);
+    let tokens = scanner.scan_tokens();
+    let mut parser = Parser::new(tokens);
+    let expression = parser.parse();
 
-    match vm.interpret(&source)? {
-        InterpretResult::Ok => {}
-        InterpretResult::CompileError => exit(65),
-        InterpretResult::RuntimeError => exit(70),
+    if *HAD_ERROR.read().unwrap() {
+        return;
     }
-    Ok(())
+
+    INTERPRETER
+        .write()
+        .unwrap()
+        .interpret(expression.as_ref().unwrap());
+}
+
+pub fn error(line: usize, message: &str) {
+    report(line, "", message);
+}
+
+pub fn error_at_token(token: &Token, message: &str) {
+    if token.kind == TokenKind::Eof {
+        report(token.line, " at end", message);
+    } else {
+        report(
+            token.line,
+            &(String::from(" at '") + &token.lexeme + "'"),
+            message,
+        );
+    }
+}
+
+pub fn runtime_error(error: runtime_error::RuntimeError) {
+    eprintln!("{}", error);
+    *HAD_RUNTIME_ERROR.write().unwrap() = true;
+}
+
+fn report(line: usize, whence: &str, message: &str) {
+    eprintln!("[line {}] Error{}: {}", line, whence, message);
+    *HAD_ERROR.write().unwrap() = true;
 }
