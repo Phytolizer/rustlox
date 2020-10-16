@@ -1,13 +1,16 @@
 use crate::{
+    expr::Assign,
     expr::Binary,
     expr::Expr,
     expr::Grouping,
     expr::Literal,
     expr::Unary,
+    expr::Variable,
     object::Object,
     stmt::Expression,
     stmt::Print,
     stmt::Stmt,
+    stmt::Var,
     token::{Token, TokenKind},
 };
 
@@ -25,14 +28,48 @@ impl Parser {
         let mut statements = vec![];
 
         while !self.at_end() {
-            statements.push(self.statement()?);
+            if let Some(decl) = self.declaration() {
+                statements.push(decl);
+            }
         }
 
         Ok(statements)
     }
 
+    fn declaration(&mut self) -> Option<Stmt> {
+        let value = if self.matches(&[TokenKind::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+        match value {
+            Ok(stmt) => Some(stmt),
+            Err(_) => {
+                self.synchronize();
+                None
+            }
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, (Token, String)> {
+        let name = self
+            .consume(TokenKind::Identifier, "Expect variable name.")?
+            .clone();
+
+        let mut initializer = None;
+        if self.matches(&[TokenKind::Equal]) {
+            initializer = Some(self.expression()?);
+        }
+
+        self.consume(
+            TokenKind::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        Ok(Stmt::Var(Var { name, initializer }))
+    }
+
     fn statement(&mut self) -> Result<Stmt, (Token, String)> {
-        if self.matches(vec![TokenKind::Print]) {
+        if self.matches(&[TokenKind::Print]) {
             return self.print_statement();
         }
 
@@ -52,13 +89,31 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, (Token, String)> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, (Token, String)> {
+        let expr = self.equality()?;
+
+        if self.matches(&[TokenKind::Equal]) {
+            let equals = self.previous().clone();
+            let value = Box::new(self.assignment()?);
+
+            if let Expr::Variable(v) = &expr {
+                let name = v.name.clone();
+                return Ok(Expr::Assign(Assign { name, value }));
+            }
+
+            Self::error(&equals, "Invalid assignment target.");
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, (Token, String)> {
         let mut expr = self.comparison()?;
 
-        while self.matches(vec![TokenKind::BangEqual, TokenKind::EqualEqual]) {
+        while self.matches(&[TokenKind::BangEqual, TokenKind::EqualEqual]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
             expr = Expr::Binary(Binary {
@@ -74,7 +129,7 @@ impl Parser {
     fn comparison(&mut self) -> Result<Expr, (Token, String)> {
         let mut expr = self.term()?;
 
-        while self.matches(vec![
+        while self.matches(&[
             TokenKind::Greater,
             TokenKind::GreaterEqual,
             TokenKind::Less,
@@ -95,7 +150,7 @@ impl Parser {
     fn term(&mut self) -> Result<Expr, (Token, String)> {
         let mut expr = self.factor()?;
 
-        while self.matches(vec![TokenKind::Minus, TokenKind::Plus]) {
+        while self.matches(&[TokenKind::Minus, TokenKind::Plus]) {
             let operator = self.previous().clone();
             let right = self.factor()?;
             expr = Expr::Binary(Binary {
@@ -111,7 +166,7 @@ impl Parser {
     fn factor(&mut self) -> Result<Expr, (Token, String)> {
         let mut expr = self.unary()?;
 
-        while self.matches(vec![TokenKind::Slash, TokenKind::Star]) {
+        while self.matches(&[TokenKind::Slash, TokenKind::Star]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             expr = Expr::Binary(Binary {
@@ -125,7 +180,7 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, (Token, String)> {
-        if self.matches(vec![TokenKind::Bang, TokenKind::Minus]) {
+        if self.matches(&[TokenKind::Bang, TokenKind::Minus]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary(Unary {
@@ -138,29 +193,35 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, (Token, String)> {
-        if self.matches(vec![TokenKind::False]) {
+        if self.matches(&[TokenKind::False]) {
             return Ok(Expr::Literal(Literal {
                 value: Object::new_bool(false),
             }));
         }
-        if self.matches(vec![TokenKind::True]) {
+        if self.matches(&[TokenKind::True]) {
             return Ok(Expr::Literal(Literal {
                 value: Object::new_bool(true),
             }));
         }
-        if self.matches(vec![TokenKind::Nil]) {
+        if self.matches(&[TokenKind::Nil]) {
             return Ok(Expr::Literal(Literal {
                 value: Object::nil(),
             }));
         }
 
-        if self.matches(vec![TokenKind::Number, TokenKind::String]) {
+        if self.matches(&[TokenKind::Number, TokenKind::String]) {
             return Ok(Expr::Literal(Literal {
                 value: self.previous().literal.clone(),
             }));
         }
 
-        if self.matches(vec![TokenKind::LParen]) {
+        if self.matches(&[TokenKind::Identifier]) {
+            return Ok(Expr::Variable(Variable {
+                name: self.previous().clone(),
+            }));
+        }
+
+        if self.matches(&[TokenKind::LParen]) {
             let expr = self.expression()?;
             self.consume(TokenKind::RParen, "Expect ')' after expression.")?;
             return Ok(Expr::Grouping(Grouping {
@@ -208,15 +269,13 @@ impl Parser {
         (token.clone(), message.to_string())
     }
 
-    fn matches(&mut self, kinds: Vec<TokenKind>) -> bool {
-        for kind in kinds {
-            if self.check(kind) {
-                self.advance();
-                return true;
-            }
+    fn matches(&mut self, kinds: &[TokenKind]) -> bool {
+        if kinds.iter().cloned().any(|k| self.check(k)) {
+            self.advance();
+            true
+        } else {
+            false
         }
-
-        false
     }
 
     fn check(&self, kind: TokenKind) -> bool {

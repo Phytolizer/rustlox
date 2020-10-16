@@ -1,4 +1,5 @@
 mod ast_printer;
+mod environment;
 mod expr;
 mod interpreter;
 mod object;

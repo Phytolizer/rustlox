@@ -1,4 +1,4 @@
-use crate::expr::{Expr, Visitor};
+use crate::expr::{self, Expr, Visitor};
 
 pub struct AstPrinter {}
 
@@ -7,7 +7,7 @@ impl AstPrinter {
         expr.accept(self)
     }
 
-    fn parenthesize(&mut self, name: &str, exprs: Vec<&Expr>) -> String {
+    fn parenthesize(&mut self, name: &str, exprs: &[&Expr]) -> String {
         format!(
             "({} {})",
             name,
@@ -20,13 +20,13 @@ impl AstPrinter {
     }
 }
 
-impl Visitor<String> for AstPrinter {
+impl expr::Visitor<String> for AstPrinter {
     fn visit_binary_expr(&mut self, binary: &crate::expr::Binary) -> String {
-        self.parenthesize(&binary.operator.lexeme, vec![&binary.left, &binary.right])
+        self.parenthesize(&binary.operator.lexeme, &[&binary.left, &binary.right])
     }
 
     fn visit_grouping_expr(&mut self, grouping: &crate::expr::Grouping) -> String {
-        self.parenthesize("group", vec![&grouping.expression])
+        self.parenthesize("group", &[&grouping.expression])
     }
 
     fn visit_literal_expr(&mut self, literal: &crate::expr::Literal) -> String {
@@ -34,6 +34,14 @@ impl Visitor<String> for AstPrinter {
     }
 
     fn visit_unary_expr(&mut self, unary: &crate::expr::Unary) -> String {
-        self.parenthesize(&unary.operator.lexeme, vec![&unary.right])
+        self.parenthesize(&unary.operator.lexeme, &[&unary.right])
+    }
+
+    fn visit_variable_expr(&mut self, variable: &expr::Variable) -> String {
+        variable.name.lexeme.clone()
+    }
+
+    fn visit_assign_expr(&mut self, expr: &expr::Assign) -> String {
+        self.parenthesize(&(format!("assign {}", expr.name.lexeme)), &[&expr.value])
     }
 }

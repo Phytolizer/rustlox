@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    expr::Expr,
-    expr::{self},
+    environment::Environment,
+    expr::{self, Expr},
     object::Object,
     runtime_error::RuntimeError,
     stmt,
@@ -36,11 +36,15 @@ fn check_number_operands(
     }
 }
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            environment: Environment::new(),
+        }
     }
 
     pub fn interpret(&mut self, statements: &[stmt::Stmt]) {
@@ -68,27 +72,35 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
         println!("{}", value);
         Ok(())
     }
+
+    fn visit_var_stmt(&mut self, stmt: &stmt::Var) -> Result<(), RuntimeError> {
+        let value = if let Some(initializer) = &stmt.initializer {
+            Some(self.evaluate(initializer)?)
+        } else {
+            None
+        };
+        self.environment
+            .define(&stmt.name.lexeme, value.unwrap_or_else(Object::nil));
+        Ok(())
+    }
 }
 
 impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
-    fn visit_binary_expr(
-        &mut self,
-        binary: &crate::expr::Binary,
-    ) -> Result<Arc<Object>, RuntimeError> {
-        let left = self.evaluate(&binary.left)?;
-        let right = self.evaluate(&binary.right)?;
+    fn visit_binary_expr(&mut self, expr: &expr::Binary) -> Result<Arc<Object>, RuntimeError> {
+        let left = self.evaluate(&expr.left)?;
+        let right = self.evaluate(&expr.right)?;
 
-        Ok(match binary.operator.kind {
+        Ok(match expr.operator.kind {
             TokenKind::Minus => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_number(left.as_number() - right.as_number())
             }
             TokenKind::Slash => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_number(left.as_number() / right.as_number())
             }
             TokenKind::Star => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_number(left.as_number() * right.as_number())
             }
             TokenKind::Plus => {
@@ -98,25 +110,25 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
                     Object::new_string(left.to_string() + right.as_string().as_ref())
                 } else {
                     return Err(RuntimeError::new(
-                        binary.operator.clone(),
+                        expr.operator.clone(),
                         String::from("Operands must be two numbers or two strings."),
                     ));
                 }
             }
             TokenKind::Greater => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_bool(left.as_number() > right.as_number())
             }
             TokenKind::GreaterEqual => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_bool(left.as_number() >= right.as_number())
             }
             TokenKind::Less => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_bool(left.as_number() < right.as_number())
             }
             TokenKind::LessEqual => {
-                check_number_operands(left.clone(), &binary.operator, right.clone())?;
+                check_number_operands(left.clone(), &expr.operator, right.clone())?;
                 Object::new_bool(left.as_number() <= right.as_number())
             }
             TokenKind::EqualEqual => Object::new_bool(left == right),
@@ -125,33 +137,35 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
         })
     }
 
-    fn visit_grouping_expr(
-        &mut self,
-        grouping: &crate::expr::Grouping,
-    ) -> Result<Arc<Object>, RuntimeError> {
-        self.evaluate(&grouping.expression)
+    fn visit_grouping_expr(&mut self, expr: &expr::Grouping) -> Result<Arc<Object>, RuntimeError> {
+        self.evaluate(&expr.expression)
     }
 
-    fn visit_literal_expr(
-        &mut self,
-        literal: &crate::expr::Literal,
-    ) -> Result<Arc<Object>, RuntimeError> {
-        Ok(literal.value.clone())
+    fn visit_literal_expr(&mut self, expr: &expr::Literal) -> Result<Arc<Object>, RuntimeError> {
+        Ok(expr.value.clone())
     }
 
-    fn visit_unary_expr(
-        &mut self,
-        unary: &crate::expr::Unary,
-    ) -> Result<Arc<Object>, RuntimeError> {
-        let right = self.evaluate(&unary.right)?;
+    fn visit_unary_expr(&mut self, expr: &expr::Unary) -> Result<Arc<Object>, RuntimeError> {
+        let right = self.evaluate(&expr.right)?;
 
-        Ok(match unary.operator.kind {
+        Ok(match expr.operator.kind {
             TokenKind::Bang => Object::new_bool(!right.as_bool()),
             TokenKind::Minus => {
-                check_number_operand(&unary.operator, right.clone())?;
+                check_number_operand(&expr.operator, right.clone())?;
                 Object::new_number(-right.as_number())
             }
             _ => unreachable!(),
         })
+    }
+
+    fn visit_variable_expr(&mut self, expr: &expr::Variable) -> Result<Arc<Object>, RuntimeError> {
+        self.environment.get(&expr.name)
+    }
+
+    fn visit_assign_expr(&mut self, expr: &expr::Assign) -> Result<Arc<Object>, RuntimeError> {
+        let value = self.evaluate(&expr.value)?;
+
+        self.environment.assign(&expr.name, value.clone())?;
+        Ok(value)
     }
 }
