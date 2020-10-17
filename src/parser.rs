@@ -9,6 +9,7 @@ use crate::{
     object::Object,
     stmt::Block,
     stmt::Expression,
+    stmt::If,
     stmt::Print,
     stmt::Stmt,
     stmt::Var,
@@ -70,6 +71,9 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, (Token, String)> {
+        if self.matches(&[TokenKind::If]) {
+            return self.if_statement();
+        }
         if self.matches(&[TokenKind::Print]) {
             return self.print_statement();
         }
@@ -80,6 +84,26 @@ impl Parser {
         }
 
         self.expression_statement()
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt, (Token, String)> {
+        self.consume(TokenKind::LParen, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RParen, "Expect ')' after if condition.")?;
+
+        let then_branch = Box::new(self.statement()?);
+        let else_branch = if self.matches(&[TokenKind::Else]) {
+            Some(self.statement()?)
+        } else {
+            None
+        }
+        .map(|eb| Box::new(eb));
+
+        Ok(Stmt::If(If {
+            condition,
+            then_branch,
+            else_branch,
+        }))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, (Token, String)> {

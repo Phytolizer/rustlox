@@ -111,6 +111,15 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
             Environment::new_enclosed(self.environment.clone()),
         )
     }
+
+    fn visit_if_stmt(&mut self, stmt: &stmt::If) -> Result<(), RuntimeError> {
+        if self.evaluate(&stmt.condition)?.as_bool() {
+            self.execute(&stmt.then_branch)?;
+        } else if let Some(else_branch) = &stmt.else_branch {
+            self.execute(else_branch)?;
+        }
+        Ok(())
+    }
 }
 
 impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
