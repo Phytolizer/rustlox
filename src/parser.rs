@@ -73,6 +73,9 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Stmt, (Token, String)> {
+        if self.matches(&[TokenKind::For]) {
+            return self.for_statement();
+        }
         if self.matches(&[TokenKind::If]) {
             return self.if_statement();
         }
@@ -89,6 +92,60 @@ impl Parser {
         }
 
         self.expression_statement()
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, (Token, String)> {
+        self.consume(TokenKind::LParen, "Expect '(' after 'for'.")?;
+        let initializer = if self.matches(&[TokenKind::Semicolon]) {
+            None
+        } else if self.matches(&[TokenKind::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+        let condition = if self.check(TokenKind::Semicolon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(TokenKind::Semicolon, "Expect ';' after for condition.")?;
+        let increment = if self.check(TokenKind::RParen) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        self.consume(TokenKind::RParen, "Expect ')' after for clauses.")?;
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block(Block {
+                statements: vec![
+                    body,
+                    Stmt::Expression(Expression {
+                        expression: increment,
+                    }),
+                ],
+            });
+        }
+
+        let condition = condition.unwrap_or_else(|| {
+            Expr::Literal(Literal {
+                value: Object::new_bool(true),
+            })
+        });
+
+        body = Stmt::While(While {
+            condition,
+            body: Box::new(body),
+        });
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(Block {
+                statements: vec![initializer, body],
+            });
+        }
+
+        Ok(body)
     }
 
     fn if_statement(&mut self) -> Result<Stmt, (Token, String)> {
