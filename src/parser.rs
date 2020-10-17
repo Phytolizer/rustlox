@@ -7,6 +7,7 @@ use crate::{
     expr::Unary,
     expr::Variable,
     object::Object,
+    stmt::Block,
     stmt::Expression,
     stmt::Print,
     stmt::Stmt,
@@ -72,8 +73,26 @@ impl Parser {
         if self.matches(&[TokenKind::Print]) {
             return self.print_statement();
         }
+        if self.matches(&[TokenKind::LBrace]) {
+            return Ok(Stmt::Block(Block {
+                statements: self.block()?,
+            }));
+        }
 
         self.expression_statement()
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, (Token, String)> {
+        let mut statements = vec![];
+
+        while !self.check(TokenKind::RBrace) && !self.at_end() {
+            if let Some(decl) = self.declaration() {
+                statements.push(decl);
+            }
+        }
+
+        self.consume(TokenKind::RBrace, "Expect '}' after block.")?;
+        Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt, (Token, String)> {

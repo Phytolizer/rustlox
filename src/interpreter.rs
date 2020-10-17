@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::{
     environment::Environment,
@@ -37,13 +37,13 @@ fn check_number_operands(
 }
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: Arc<RwLock<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new(),
+            environment: Arc::new(RwLock::new(Environment::new())),
         }
     }
 
@@ -55,6 +55,25 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &stmt::Stmt) -> Result<(), RuntimeError> {
         stmt.accept(self)
+    }
+
+    fn execute_block(
+        &mut self,
+        statements: &[stmt::Stmt],
+        environment: Environment,
+    ) -> Result<(), RuntimeError> {
+        let previous = self.environment.clone();
+
+        self.environment = Arc::new(RwLock::new(environment));
+
+        for statement in statements {
+            if let Err(e) = self.execute(statement) {
+                self.environment = previous;
+                return Err(e);
+            }
+        }
+        self.environment = previous;
+        Ok(())
     }
 
     fn evaluate(&mut self, expr: &Expr) -> Result<Arc<Object>, RuntimeError> {
@@ -80,8 +99,17 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
             None
         };
         self.environment
+            .write()
+            .unwrap()
             .define(&stmt.name.lexeme, value.unwrap_or_else(Object::nil));
         Ok(())
+    }
+
+    fn visit_block_stmt(&mut self, stmt: &stmt::Block) -> Result<(), RuntimeError> {
+        self.execute_block(
+            &stmt.statements,
+            Environment::new_enclosed(self.environment.clone()),
+        )
     }
 }
 
@@ -159,13 +187,16 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
     }
 
     fn visit_variable_expr(&mut self, expr: &expr::Variable) -> Result<Arc<Object>, RuntimeError> {
-        self.environment.get(&expr.name)
+        self.environment.read().unwrap().get(&expr.name)
     }
 
     fn visit_assign_expr(&mut self, expr: &expr::Assign) -> Result<Arc<Object>, RuntimeError> {
         let value = self.evaluate(&expr.value)?;
 
-        self.environment.assign(&expr.name, value.clone())?;
+        self.environment
+            .write()
+            .unwrap()
+            .assign(&expr.name, value.clone())?;
         Ok(value)
     }
 }
