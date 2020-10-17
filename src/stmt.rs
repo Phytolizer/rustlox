@@ -6,6 +6,7 @@ pub trait Visitor<T> {
     fn visit_if_stmt(&mut self, stmt: &If) -> T;
     fn visit_print_stmt(&mut self, stmt: &Print) -> T;
     fn visit_var_stmt(&mut self, stmt: &Var) -> T;
+    fn visit_while_stmt(&mut self, stmt: &While) -> T;
 }
 
 pub enum Stmt {
@@ -14,6 +15,7 @@ pub enum Stmt {
     If(If),
     Print(Print),
     Var(Var),
+    While(While),
 }
 
 impl Stmt {
@@ -24,6 +26,7 @@ impl Stmt {
             Stmt::If(i) => visitor.visit_if_stmt(i),
             Stmt::Print(p) => visitor.visit_print_stmt(p),
             Stmt::Var(v) => visitor.visit_var_stmt(v),
+            Stmt::While(w) => visitor.visit_while_stmt(w),
         }
     }
 }
@@ -49,4 +52,9 @@ pub struct Print {
 pub struct Var {
     pub name: Token,
     pub initializer: Option<Expr>,
+}
+
+pub struct While {
+    pub condition: Expr,
+    pub body: Box<Stmt>,
 }

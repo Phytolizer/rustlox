@@ -14,6 +14,7 @@ use crate::{
     stmt::Print,
     stmt::Stmt,
     stmt::Var,
+    stmt::While,
     token::{Token, TokenKind},
 };
 
@@ -78,6 +79,9 @@ impl Parser {
         if self.matches(&[TokenKind::Print]) {
             return self.print_statement();
         }
+        if self.matches(&[TokenKind::While]) {
+            return self.while_statement();
+        }
         if self.matches(&[TokenKind::LBrace]) {
             return Ok(Stmt::Block(Block {
                 statements: self.block()?,
@@ -124,6 +128,16 @@ impl Parser {
         let value = self.expression()?;
         self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(Print { expression: value }))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, (Token, String)> {
+        self.consume(TokenKind::LParen, "Expect '(' after 'while'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RParen, "Expect ')' after while condition")?;
+
+        let body = Box::new(self.statement()?);
+
+        Ok(Stmt::While(While { condition, body }))
     }
 
     fn expression_statement(&mut self) -> Result<Stmt, (Token, String)> {

@@ -120,6 +120,13 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
         }
         Ok(())
     }
+
+    fn visit_while_stmt(&mut self, stmt: &stmt::While) -> Result<(), RuntimeError> {
+        while self.evaluate(&stmt.condition)?.as_bool() {
+            self.execute(&stmt.body)?;
+        }
+        Ok(())
+    }
 }
 
 impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
