@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
-use crate::{object::Object, token::Token};
+use crate::{object::LoxObject, token::Token};
 
 pub trait Visitor<T> {
     fn visit_assign_expr(&mut self, expr: &Assign) -> T;
     fn visit_binary_expr(&mut self, expr: &Binary) -> T;
+    fn visit_call_expr(&mut self, expr: &Call) -> T;
     fn visit_grouping_expr(&mut self, expr: &Grouping) -> T;
     fn visit_literal_expr(&mut self, expr: &Literal) -> T;
     fn visit_logical_expr(&mut self, expr: &Logical) -> T;
@@ -15,6 +14,7 @@ pub trait Visitor<T> {
 pub enum Expr {
     Assign(Assign),
     Binary(Binary),
+    Call(Call),
     Grouping(Grouping),
     Literal(Literal),
     Logical(Logical),
@@ -27,6 +27,7 @@ impl Expr {
         match self {
             Expr::Assign(a) => visitor.visit_assign_expr(a),
             Expr::Binary(b) => visitor.visit_binary_expr(b),
+            Expr::Call(c) => visitor.visit_call_expr(c),
             Expr::Grouping(g) => visitor.visit_grouping_expr(g),
             Expr::Literal(l) => visitor.visit_literal_expr(l),
             Expr::Logical(l) => visitor.visit_logical_expr(l),
@@ -47,12 +48,18 @@ pub struct Binary {
     pub right: Box<Expr>,
 }
 
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub paren: Token,
+    pub arguments: Vec<Expr>,
+}
+
 pub struct Grouping {
     pub expression: Box<Expr>,
 }
 
 pub struct Literal {
-    pub value: Arc<Object>,
+    pub value: LoxObject,
 }
 
 pub struct Logical {

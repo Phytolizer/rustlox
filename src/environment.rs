@@ -1,10 +1,10 @@
 use std::{collections::HashMap, sync::Arc, sync::RwLock};
 
-use crate::{object::Object, runtime_error::RuntimeError, token::Token};
+use crate::{object::LoxObject, runtime_error::RuntimeError, token::Token};
 
 pub struct Environment {
     enclosing: Option<Arc<RwLock<Environment>>>,
-    values: HashMap<String, Arc<Object>>,
+    values: HashMap<String, LoxObject>,
 }
 
 impl Environment {
@@ -22,11 +22,11 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: &str, value: Arc<Object>) {
+    pub fn define(&mut self, name: &str, value: LoxObject) {
         self.values.insert(name.to_owned(), value);
     }
 
-    fn try_get(&self, name: &Token) -> Option<Arc<Object>> {
+    fn try_get(&self, name: &Token) -> Option<LoxObject> {
         self.values.get(&name.lexeme).cloned().or_else(|| {
             self.enclosing
                 .as_ref()
@@ -34,7 +34,7 @@ impl Environment {
         })
     }
 
-    pub fn get(&self, name: &Token) -> Result<Arc<Object>, RuntimeError> {
+    pub fn get(&self, name: &Token) -> Result<LoxObject, RuntimeError> {
         self.try_get(name).ok_or_else(|| {
             RuntimeError::new(
                 name.clone(),
@@ -43,7 +43,7 @@ impl Environment {
         })
     }
 
-    fn try_assign(&mut self, name: &Token, value: Arc<Object>) -> Option<()> {
+    fn try_assign(&mut self, name: &Token, value: LoxObject) -> Option<()> {
         self.values
             .get_mut(&name.lexeme)
             .map(|v| *v = value.clone())
@@ -54,7 +54,7 @@ impl Environment {
             })
     }
 
-    pub fn assign(&mut self, name: &Token, value: Arc<Object>) -> Result<(), RuntimeError> {
+    pub fn assign(&mut self, name: &Token, value: LoxObject) -> Result<(), RuntimeError> {
         self.try_assign(name, value).ok_or_else(|| {
             RuntimeError::new(
                 name.clone(),

@@ -1,6 +1,6 @@
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
 
-use crate::object::Object;
+use crate::object::LoxObject;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenKind {
@@ -53,12 +53,12 @@ pub enum TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: String,
-    pub literal: Arc<Object>,
+    pub literal: LoxObject,
     pub line: usize,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, lexeme: String, literal: Arc<Object>, line: usize) -> Self {
+    pub fn new(kind: TokenKind, lexeme: String, literal: LoxObject, line: usize) -> Self {
         Self {
             kind,
             lexeme,
@@ -70,6 +70,12 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {} {}", self.kind, self.lexeme, self.literal)
+        write!(
+            f,
+            "{:?} {} {}",
+            self.kind,
+            self.lexeme,
+            self.literal.read().unwrap()
+        )
     }
 }

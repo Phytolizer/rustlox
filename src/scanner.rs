@@ -1,8 +1,9 @@
 use lazy_static::lazy_static;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
+    object::LoxObject,
     object::Object,
     token::{Token, TokenKind},
 };
@@ -165,7 +166,7 @@ impl Scanner {
             .collect::<String>()
             .parse::<f64>()
             .unwrap();
-        self.add_token(TokenKind::Number, Arc::new(Object::Number(value)));
+        self.add_token(TokenKind::Number, Object::new_number(value));
     }
 
     fn string(&mut self) {
@@ -186,10 +187,10 @@ impl Scanner {
         let value = self.source[self.start + 1..self.current - 1]
             .iter()
             .collect::<String>();
-        self.add_token(TokenKind::String, Arc::new(Object::String(value)));
+        self.add_token(TokenKind::String, Object::new_string(value));
     }
 
-    fn add_token(&mut self, kind: TokenKind, literal: Arc<Object>) {
+    fn add_token(&mut self, kind: TokenKind, literal: LoxObject) {
         let text = self.source[self.start..self.current]
             .iter()
             .collect::<String>();

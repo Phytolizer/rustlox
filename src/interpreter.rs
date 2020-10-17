@@ -1,8 +1,12 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    sync::{Arc, RwLock},
+    time::SystemTime,
+};
 
 use crate::{
     environment::Environment,
     expr::{self, Expr},
+    object::LoxObject,
     object::Object,
     runtime_error::RuntimeError,
     stmt,
@@ -10,8 +14,8 @@ use crate::{
     token::TokenKind,
 };
 
-fn check_number_operand(operator: &Token, operand: Arc<Object>) -> Result<(), RuntimeError> {
-    if operand.is_number() {
+fn check_number_operand(operator: &Token, operand: LoxObject) -> Result<(), RuntimeError> {
+    if operand.read().unwrap().is_number() {
         Ok(())
     } else {
         Err(RuntimeError::new(
@@ -22,11 +26,11 @@ fn check_number_operand(operator: &Token, operand: Arc<Object>) -> Result<(), Ru
 }
 
 fn check_number_operands(
-    left: Arc<Object>,
+    left: LoxObject,
     operator: &Token,
-    right: Arc<Object>,
+    right: LoxObject,
 ) -> Result<(), RuntimeError> {
-    if left.is_number() && right.is_number() {
+    if left.read().unwrap().is_number() && right.read().unwrap().is_number() {
         Ok(())
     } else {
         Err(RuntimeError::new(
@@ -37,13 +41,29 @@ fn check_number_operands(
 }
 
 pub struct Interpreter {
+    globals: Arc<RwLock<Environment>>,
     environment: Arc<RwLock<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Arc::new(RwLock::new(Environment::new()));
+
+        globals.write().unwrap().define(
+            "clock",
+            Object::new_builtin_function(0, |_args| {
+                Object::new_number(
+                    SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs_f64(),
+                )
+            }),
+        );
+
         Self {
-            environment: Arc::new(RwLock::new(Environment::new())),
+            globals: globals.clone(),
+            environment: globals,
         }
     }
 
@@ -76,7 +96,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: &Expr) -> Result<Arc<Object>, RuntimeError> {
+    fn evaluate(&mut self, expr: &Expr) -> Result<LoxObject, RuntimeError> {
         expr.accept(self)
     }
 }
@@ -88,7 +108,7 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
 
     fn visit_print_stmt(&mut self, stmt: &stmt::Print) -> Result<(), RuntimeError> {
         let value = self.evaluate(&stmt.expression)?;
-        println!("{}", value);
+        println!("{}", value.read().unwrap());
         Ok(())
     }
 
@@ -113,7 +133,7 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
     }
 
     fn visit_if_stmt(&mut self, stmt: &stmt::If) -> Result<(), RuntimeError> {
-        if self.evaluate(&stmt.condition)?.as_bool() {
+        if self.evaluate(&stmt.condition)?.read().unwrap().as_bool() {
             self.execute(&stmt.then_branch)?;
         } else if let Some(else_branch) = &stmt.else_branch {
             self.execute(else_branch)?;
@@ -122,36 +142,47 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
     }
 
     fn visit_while_stmt(&mut self, stmt: &stmt::While) -> Result<(), RuntimeError> {
-        while self.evaluate(&stmt.condition)?.as_bool() {
+        while self.evaluate(&stmt.condition)?.read().unwrap().as_bool() {
             self.execute(&stmt.body)?;
         }
         Ok(())
     }
 }
 
-impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
-    fn visit_binary_expr(&mut self, expr: &expr::Binary) -> Result<Arc<Object>, RuntimeError> {
+impl expr::Visitor<Result<LoxObject, RuntimeError>> for Interpreter {
+    fn visit_binary_expr(&mut self, expr: &expr::Binary) -> Result<LoxObject, RuntimeError> {
         let left = self.evaluate(&expr.left)?;
         let right = self.evaluate(&expr.right)?;
 
         Ok(match expr.operator.kind {
             TokenKind::Minus => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_number(left.as_number() - right.as_number())
+                Object::new_number(
+                    left.read().unwrap().as_number() - right.read().unwrap().as_number(),
+                )
             }
             TokenKind::Slash => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_number(left.as_number() / right.as_number())
+                Object::new_number(
+                    left.read().unwrap().as_number() / right.read().unwrap().as_number(),
+                )
             }
             TokenKind::Star => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_number(left.as_number() * right.as_number())
+                Object::new_number(
+                    left.read().unwrap().as_number() * right.read().unwrap().as_number(),
+                )
             }
             TokenKind::Plus => {
-                if left.is_number() && right.is_number() {
-                    Object::new_number(left.as_number() + right.as_number())
-                } else if left.is_string() && right.is_string() {
-                    Object::new_string(left.to_string() + right.as_string().as_ref())
+                if left.read().unwrap().is_number() && right.read().unwrap().is_number() {
+                    Object::new_number(
+                        left.read().unwrap().as_number() + right.read().unwrap().as_number(),
+                    )
+                } else if left.read().unwrap().is_string() && right.read().unwrap().is_string() {
+                    Object::new_string(
+                        left.read().unwrap().to_string()
+                            + right.read().unwrap().as_string().as_ref(),
+                    )
                 } else {
                     return Err(RuntimeError::new(
                         expr.operator.clone(),
@@ -161,52 +192,64 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
             }
             TokenKind::Greater => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_bool(left.as_number() > right.as_number())
+                Object::new_bool(
+                    left.read().unwrap().as_number() > right.read().unwrap().as_number(),
+                )
             }
             TokenKind::GreaterEqual => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_bool(left.as_number() >= right.as_number())
+                Object::new_bool(
+                    left.read().unwrap().as_number() >= right.read().unwrap().as_number(),
+                )
             }
             TokenKind::Less => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_bool(left.as_number() < right.as_number())
+                Object::new_bool(
+                    left.read().unwrap().as_number() < right.read().unwrap().as_number(),
+                )
             }
             TokenKind::LessEqual => {
                 check_number_operands(left.clone(), &expr.operator, right.clone())?;
-                Object::new_bool(left.as_number() <= right.as_number())
+                Object::new_bool(
+                    left.read().unwrap().as_number() <= right.read().unwrap().as_number(),
+                )
             }
-            TokenKind::EqualEqual => Object::new_bool(left == right),
-            TokenKind::BangEqual => Object::new_bool(left != right),
+            TokenKind::EqualEqual => {
+                Object::new_bool(left.read().unwrap().eq(&right.read().unwrap()))
+            }
+            TokenKind::BangEqual => {
+                Object::new_bool(left.read().unwrap().eq(&right.read().unwrap()))
+            }
             _ => unreachable!(),
         })
     }
 
-    fn visit_grouping_expr(&mut self, expr: &expr::Grouping) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_grouping_expr(&mut self, expr: &expr::Grouping) -> Result<LoxObject, RuntimeError> {
         self.evaluate(&expr.expression)
     }
 
-    fn visit_literal_expr(&mut self, expr: &expr::Literal) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_literal_expr(&mut self, expr: &expr::Literal) -> Result<LoxObject, RuntimeError> {
         Ok(expr.value.clone())
     }
 
-    fn visit_unary_expr(&mut self, expr: &expr::Unary) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_unary_expr(&mut self, expr: &expr::Unary) -> Result<LoxObject, RuntimeError> {
         let right = self.evaluate(&expr.right)?;
 
         Ok(match expr.operator.kind {
-            TokenKind::Bang => Object::new_bool(!right.as_bool()),
+            TokenKind::Bang => Object::new_bool(!right.read().unwrap().as_bool()),
             TokenKind::Minus => {
                 check_number_operand(&expr.operator, right.clone())?;
-                Object::new_number(-right.as_number())
+                Object::new_number(-right.read().unwrap().as_number())
             }
             _ => unreachable!(),
         })
     }
 
-    fn visit_variable_expr(&mut self, expr: &expr::Variable) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_variable_expr(&mut self, expr: &expr::Variable) -> Result<LoxObject, RuntimeError> {
         self.environment.read().unwrap().get(&expr.name)
     }
 
-    fn visit_assign_expr(&mut self, expr: &expr::Assign) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_assign_expr(&mut self, expr: &expr::Assign) -> Result<LoxObject, RuntimeError> {
         let value = self.evaluate(&expr.value)?;
 
         self.environment
@@ -216,17 +259,17 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
         Ok(value)
     }
 
-    fn visit_logical_expr(&mut self, expr: &expr::Logical) -> Result<Arc<Object>, RuntimeError> {
+    fn visit_logical_expr(&mut self, expr: &expr::Logical) -> Result<LoxObject, RuntimeError> {
         let left = self.evaluate(&expr.left)?;
 
         match expr.operator.kind {
             TokenKind::Or => {
-                if left.as_bool() {
+                if left.read().unwrap().as_bool() {
                     return Ok(left);
                 }
             }
             TokenKind::And => {
-                if !left.as_bool() {
+                if !left.read().unwrap().as_bool() {
                     return Ok(left);
                 }
             }
@@ -234,5 +277,35 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
         }
 
         self.evaluate(&expr.right)
+    }
+
+    fn visit_call_expr(&mut self, expr: &expr::Call) -> Result<LoxObject, RuntimeError> {
+        let callee = self.evaluate(&expr.callee)?;
+
+        let mut arguments = vec![];
+        for arg in &expr.arguments {
+            arguments.push(self.evaluate(arg)?);
+        }
+
+        if !callee.read().unwrap().is_callable() {
+            return Err(RuntimeError::new(
+                expr.paren.clone(),
+                String::from("Can only call functions and classes."),
+            ));
+        }
+
+        if arguments.len() != callee.read().unwrap().arity() {
+            return Err(RuntimeError::new(
+                expr.paren.clone(),
+                format!(
+                    "Expected {} arguments but got {}.",
+                    callee.read().unwrap().arity(),
+                    arguments.len()
+                ),
+            ));
+        }
+
+        let ret = callee.write().unwrap().call(self, arguments);
+        Ok(ret)
     }
 }

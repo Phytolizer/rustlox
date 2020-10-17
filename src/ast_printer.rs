@@ -30,7 +30,7 @@ impl expr::Visitor<String> for AstPrinter {
     }
 
     fn visit_literal_expr(&mut self, literal: &crate::expr::Literal) -> String {
-        literal.value.to_string()
+        literal.value.read().unwrap().to_string()
     }
 
     fn visit_unary_expr(&mut self, unary: &crate::expr::Unary) -> String {
@@ -42,10 +42,22 @@ impl expr::Visitor<String> for AstPrinter {
     }
 
     fn visit_assign_expr(&mut self, expr: &expr::Assign) -> String {
-        self.parenthesize(&(format!("assign {}", expr.name.lexeme)), &[&expr.value])
+        self.parenthesize(&format!("{}=", expr.name.lexeme), &[&expr.value])
     }
 
     fn visit_logical_expr(&mut self, expr: &expr::Logical) -> String {
         self.parenthesize(&expr.operator.lexeme, &[&expr.left, &expr.right])
+    }
+
+    fn visit_call_expr(&mut self, expr: &expr::Call) -> String {
+        format!(
+            "({} {})",
+            expr.callee.accept(self),
+            expr.arguments
+                .iter()
+                .map(|a| a.accept(self))
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
     }
 }

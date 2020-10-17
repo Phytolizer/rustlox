@@ -1,6 +1,7 @@
 use crate::{
     expr::Assign,
     expr::Binary,
+    expr::Call,
     expr::Expr,
     expr::Grouping,
     expr::Literal,
@@ -336,7 +337,47 @@ impl Parser {
             }));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr, (Token, String)> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.matches(&[TokenKind::LParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, (Token, String)> {
+        let mut arguments = vec![];
+        if !self.check(TokenKind::RParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    // report, don't stop parsing
+                    Self::error(self.peek(), "Can't have more than 255 arguments");
+                }
+                arguments.push(self.expression()?);
+                if !self.matches(&[TokenKind::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self
+            .consume(TokenKind::RParen, "Expect ')' after arguments.")?
+            .clone();
+
+        Ok(Expr::Call(Call {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        }))
     }
 
     fn primary(&mut self) -> Result<Expr, (Token, String)> {
