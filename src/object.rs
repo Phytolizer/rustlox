@@ -2,7 +2,9 @@ use lazy_static::lazy_static;
 
 use std::{borrow::Cow, fmt::Debug, fmt::Display, sync::Arc, sync::RwLock};
 
-use crate::interpreter::Interpreter;
+use crate::{
+    environment::Environment, interpreter::Interpreter, runtime_error::RuntimeError, stmt,
+};
 
 pub type LoxObject = Arc<RwLock<Object>>;
 
@@ -19,6 +21,7 @@ pub enum Object {
     Number(f64),
     Bool(bool),
     BuiltinFunction(usize, fn(Vec<LoxObject>) -> LoxObject),
+    Function(LoxFunction),
 }
 
 impl Object {
@@ -43,6 +46,10 @@ impl Object {
 
     pub fn new_builtin_function(arity: usize, func: fn(Vec<LoxObject>) -> LoxObject) -> LoxObject {
         Arc::new(RwLock::new(Object::BuiltinFunction(arity, func)))
+    }
+
+    pub fn new_function(declaration: stmt::Function) -> LoxObject {
+        Arc::new(RwLock::new(Object::Function(LoxFunction { declaration })))
     }
 
     pub fn is_nil(&self) -> bool {
@@ -89,7 +96,7 @@ impl Object {
             Object::String(s) => s.len() as f64,
             Object::Number(n) => *n,
             Object::Bool(b) => *b as i32 as f64,
-            Object::BuiltinFunction(..) => 0.0,
+            _ => unreachable!(),
         }
     }
 
@@ -107,13 +114,27 @@ impl Object {
             Object::String(_) => false,
             Object::Number(_) => false,
             Object::Bool(_) => false,
-            Object::BuiltinFunction(..) => true,
+            Object::BuiltinFunction(_, _) => true,
+            Object::Function(_) => true,
         }
     }
 
-    pub fn call(&mut self, interpreter: &mut Interpreter, arguments: Vec<LoxObject>) -> LoxObject {
+    pub fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<LoxObject>,
+    ) -> Result<LoxObject, RuntimeError> {
         match self {
-            Object::BuiltinFunction(_, func) => func(arguments),
+            Object::BuiltinFunction(_, func) => Ok(func(arguments)),
+            Object::Function(f) => {
+                let mut environment = Environment::new_enclosed(interpreter.globals.clone());
+                for i in 0..f.declaration.params.len() {
+                    environment.define(&f.declaration.params[i].lexeme, arguments[i].clone());
+                }
+
+                interpreter.execute_block(&f.declaration.body, environment)?;
+                Ok(Object::nil())
+            }
             _ => unreachable!(),
         }
     }
@@ -121,6 +142,7 @@ impl Object {
     pub fn arity(&self) -> usize {
         match self {
             Object::BuiltinFunction(arity, ..) => *arity,
+            Object::Function(f) => f.declaration.params.len(),
             _ => std::usize::MAX,
         }
     }
@@ -134,6 +156,7 @@ impl Display for Object {
             Object::Number(n) => write!(f, "{}", n),
             Object::Bool(b) => write!(f, "{}", b),
             Object::BuiltinFunction(..) => write!(f, "<native fn>"),
+            Object::Function(func) => write!(f, "<fn {}>", func.declaration.name.lexeme),
         }
     }
 }
@@ -154,4 +177,9 @@ impl PartialEq for Object {
             false
         }
     }
+}
+
+#[derive(Debug)]
+pub struct LoxFunction {
+    pub declaration: stmt::Function,
 }

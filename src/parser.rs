@@ -11,6 +11,7 @@ use crate::{
     object::Object,
     stmt::Block,
     stmt::Expression,
+    stmt::Function,
     stmt::If,
     stmt::Print,
     stmt::Stmt,
@@ -42,7 +43,9 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        let value = if self.matches(&[TokenKind::Var]) {
+        let value = if self.matches(&[TokenKind::Fun]) {
+            self.function("function")
+        } else if self.matches(&[TokenKind::Var]) {
             self.var_declaration()
         } else {
             self.statement()
@@ -54,6 +57,43 @@ impl Parser {
                 None
             }
         }
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt, (Token, String)> {
+        let name = self
+            .consume(TokenKind::Identifier, &format!("Expect {} name.", kind))?
+            .clone();
+        self.consume(
+            TokenKind::LParen,
+            &format!("Expect '{{' after {} name.", kind),
+        )?;
+        let mut parameters = vec![];
+        if !self.check(TokenKind::RParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    Self::error(self.peek(), "Can't have more than 255 parameters.");
+                }
+
+                parameters.push(
+                    self.consume(TokenKind::Identifier, "Expect parameter name.")?
+                        .clone(),
+                );
+                if !self.matches(&[TokenKind::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenKind::RParen, "Expect ')' after parameters.")?;
+        self.consume(
+            TokenKind::LBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+        let body = self.block()?;
+        Ok(Stmt::Function(Function {
+            name,
+            params: parameters,
+            body,
+        }))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, (Token, String)> {

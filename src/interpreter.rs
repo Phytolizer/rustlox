@@ -41,7 +41,7 @@ fn check_number_operands(
 }
 
 pub struct Interpreter {
-    globals: Arc<RwLock<Environment>>,
+    pub globals: Arc<RwLock<Environment>>,
     environment: Arc<RwLock<Environment>>,
 }
 
@@ -77,7 +77,7 @@ impl Interpreter {
         stmt.accept(self)
     }
 
-    fn execute_block(
+    pub fn execute_block(
         &mut self,
         statements: &[stmt::Stmt],
         environment: Environment,
@@ -145,6 +145,15 @@ impl stmt::Visitor<Result<(), RuntimeError>> for Interpreter {
         while self.evaluate(&stmt.condition)?.read().unwrap().as_bool() {
             self.execute(&stmt.body)?;
         }
+        Ok(())
+    }
+
+    fn visit_function_stmt(&mut self, stmt: &stmt::Function) -> Result<(), RuntimeError> {
+        let function = Object::new_function(stmt.clone());
+        self.environment
+            .write()
+            .unwrap()
+            .define(&stmt.name.lexeme, function);
         Ok(())
     }
 }
@@ -305,7 +314,7 @@ impl expr::Visitor<Result<LoxObject, RuntimeError>> for Interpreter {
             ));
         }
 
-        let ret = callee.write().unwrap().call(self, arguments);
+        let ret = callee.write().unwrap().call(self, arguments)?;
         Ok(ret)
     }
 }

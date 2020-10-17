@@ -11,6 +11,7 @@ pub trait Visitor<T> {
     fn visit_variable_expr(&mut self, expr: &Variable) -> T;
 }
 
+#[derive(Debug, Clone)]
 pub enum Expr {
     Assign(Assign),
     Binary(Binary),
@@ -37,42 +38,50 @@ impl Expr {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Call {
     pub callee: Box<Expr>,
     pub paren: Token,
     pub arguments: Vec<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Grouping {
     pub expression: Box<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Literal {
     pub value: LoxObject,
 }
 
+#[derive(Debug, Clone)]
 pub struct Logical {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: Token,
 }
