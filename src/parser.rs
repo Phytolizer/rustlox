@@ -4,6 +4,7 @@ use crate::{
     expr::Expr,
     expr::Grouping,
     expr::Literal,
+    expr::Logical,
     expr::Unary,
     expr::Variable,
     object::Object,
@@ -136,7 +137,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> Result<Expr, (Token, String)> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.matches(&[TokenKind::Equal]) {
             let equals = self.previous().clone();
@@ -148,6 +149,38 @@ impl Parser {
             }
 
             Self::error(&equals, "Invalid assignment target.");
+        }
+
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, (Token, String)> {
+        let mut expr = self.and()?;
+
+        while self.matches(&[TokenKind::Or]) {
+            let operator = self.previous().clone();
+            let right = Box::new(self.and()?);
+            expr = Expr::Logical(Logical {
+                left: Box::new(expr),
+                operator,
+                right,
+            })
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, (Token, String)> {
+        let mut expr = self.equality()?;
+
+        while self.matches(&[TokenKind::And]) {
+            let operator = self.previous().clone();
+            let right = Box::new(self.equality()?);
+            expr = Expr::Logical(Logical {
+                left: Box::new(expr),
+                operator,
+                right,
+            });
         }
 
         Ok(expr)

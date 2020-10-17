@@ -7,6 +7,7 @@ pub trait Visitor<T> {
     fn visit_binary_expr(&mut self, expr: &Binary) -> T;
     fn visit_grouping_expr(&mut self, expr: &Grouping) -> T;
     fn visit_literal_expr(&mut self, expr: &Literal) -> T;
+    fn visit_logical_expr(&mut self, expr: &Logical) -> T;
     fn visit_unary_expr(&mut self, expr: &Unary) -> T;
     fn visit_variable_expr(&mut self, expr: &Variable) -> T;
 }
@@ -16,6 +17,7 @@ pub enum Expr {
     Binary(Binary),
     Grouping(Grouping),
     Literal(Literal),
+    Logical(Logical),
     Unary(Unary),
     Variable(Variable),
 }
@@ -27,6 +29,7 @@ impl Expr {
             Expr::Binary(b) => visitor.visit_binary_expr(b),
             Expr::Grouping(g) => visitor.visit_grouping_expr(g),
             Expr::Literal(l) => visitor.visit_literal_expr(l),
+            Expr::Logical(l) => visitor.visit_logical_expr(l),
             Expr::Unary(u) => visitor.visit_unary_expr(u),
             Expr::Variable(v) => visitor.visit_variable_expr(v),
         }
@@ -50,6 +53,12 @@ pub struct Grouping {
 
 pub struct Literal {
     pub value: Arc<Object>,
+}
+
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub operator: Token,
+    pub right: Box<Expr>,
 }
 
 pub struct Unary {

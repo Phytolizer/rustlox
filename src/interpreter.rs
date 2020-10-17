@@ -208,4 +208,24 @@ impl expr::Visitor<Result<Arc<Object>, RuntimeError>> for Interpreter {
             .assign(&expr.name, value.clone())?;
         Ok(value)
     }
+
+    fn visit_logical_expr(&mut self, expr: &expr::Logical) -> Result<Arc<Object>, RuntimeError> {
+        let left = self.evaluate(&expr.left)?;
+
+        match expr.operator.kind {
+            TokenKind::Or => {
+                if left.as_bool() {
+                    return Ok(left);
+                }
+            }
+            TokenKind::And => {
+                if !left.as_bool() {
+                    return Ok(left);
+                }
+            }
+            _ => unreachable!(),
+        }
+
+        self.evaluate(&expr.right)
+    }
 }
